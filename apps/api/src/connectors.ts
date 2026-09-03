@@ -20,6 +20,8 @@ export async function searchOpenAlex(term: string, email = '', limit = 12): Prom
     venue: item.primary_location?.source?.display_name ?? item.type_crossref ?? 'Unknown venue', doi: cleanDoi(item.doi),
     authors: (item.authorships ?? []).map((authorship: any) => { const parts = String(authorship.author?.display_name ?? '').trim().split(/\s+/); return { given: parts.slice(0,-1).join(' '), family: parts.at(-1) ?? 'Unknown', orcid: authorship.author?.orcid }; }),
     verificationStatus: item.doi ? 'partial' : 'unverified', accessClass: item.open_access?.is_oa ? 'open_access' : 'metadata_only',
+    publisher: item.primary_location?.source?.host_organization_name ?? '', publicationDate: item.publication_date ?? '',
+    salientContribution: reconstructAbstract(item.abstract_inverted_index).split(/(?<=[.!?])\s/)[0] ?? '',
     connector: 'openalex', externalId: item.id, sourcePayload: item }));
 }
 
@@ -32,7 +34,10 @@ export async function searchCrossref(term: string, limit = 8): Promise<Candidate
   return (data.message?.items ?? []).map((item: any) => ({ title: item.title?.[0] ?? 'Untitled', abstract: String(item.abstract ?? '').replace(/<[^>]+>/g, ' '),
     year: item.published?.['date-parts']?.[0]?.[0] ?? null, venue: item['container-title']?.[0] ?? 'Unknown venue', doi: cleanDoi(item.DOI),
     authors: (item.author ?? []).map((author: any) => ({ given: author.given ?? '', family: author.family ?? 'Unknown', orcid: author.ORCID })),
-    verificationStatus: 'partial', connector: 'crossref', externalId: item.DOI ?? item.URL, sourcePayload: item }));
+    verificationStatus: 'partial', publisher: item.publisher ?? '', volume: item.volume ?? '', issue: item.issue ?? '', pages: item.page ?? '',
+    publicationDate: item.published?.['date-parts']?.[0]?.join('-') ?? '', affiliations: (item.author ?? []).flatMap((author:any)=>author.affiliation??[]).map((aff:any)=>({name:aff.name,place:aff.place?.join(', ')??''})),
+    salientContribution: String(item.abstract ?? '').replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s/)[0] ?? '',
+    connector: 'crossref', externalId: item.DOI ?? item.URL, sourcePayload: item }));
 }
 
 export async function discover(term: string, sources: string[], email = '') {

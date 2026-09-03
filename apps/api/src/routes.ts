@@ -12,7 +12,9 @@ import { answerQuestion } from './ask.js';
 const Id = z.string().uuid();
 const workInput = z.object({ title: z.string().min(1), abstract: z.string().optional(), year: z.number().int().min(1000).max(3000).nullable().optional(),
   venue: z.string().optional(), doi: z.string().nullable().optional(), authors: z.array(z.object({ given: z.string().optional(), family: z.string().min(1), orcid: z.string().nullable().optional() })).optional(),
-  verificationStatus: z.enum(['unverified','partial','verified','verified_multi_source','conflict']).optional(), manifestationType: z.string().optional(), accessClass: z.string().optional() });
+  verificationStatus: z.enum(['unverified','partial','verified','verified_multi_source','conflict']).optional(), manifestationType: z.string().optional(), accessClass: z.string().optional(),
+  publisher: z.string().optional(), publicationPlace: z.string().optional(), publicationDate: z.string().optional(), volume: z.string().optional(), issue: z.string().optional(), pages: z.string().optional(),
+  affiliations: z.array(z.object({ name: z.string(), place: z.string().optional() })).optional(), salientContribution: z.string().optional(), recordKind: z.enum(['scholarly_record','demo_fixture']).optional() });
 
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();

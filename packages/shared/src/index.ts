@@ -19,6 +19,15 @@ export const Work = z.object({
   doi: z.string().nullable(),
   citationKey: z.string(),
   authors: z.array(Author),
+  publisher: z.string().default(''),
+  publicationPlace: z.string().default(''),
+  publicationDate: z.string().default(''),
+  volume: z.string().default(''),
+  issue: z.string().default(''),
+  pages: z.string().default(''),
+  affiliations: z.array(z.object({ name: z.string(), place: z.string().default('') })).default([]),
+  salientContribution: z.string().default(''),
+  recordKind: z.enum(['scholarly_record', 'demo_fixture']).default('scholarly_record'),
   verificationStatus: VerificationStatus,
   manifestationType: z.string().default('version_of_record'),
   accessClass: z.string().default('metadata_only'),
@@ -55,7 +64,7 @@ export interface SearchResult {
 }
 
 export interface GraphProjection {
-  nodes: Array<{ id: string; label: string; year: number | null; venue: string; status?: WorkStatus; cluster?: string }>;
+  nodes: Array<{ id: string; label: string; year: number | null; venue: string; gist: string; status?: WorkStatus; cluster?: string }>;
   edges: Relationship[];
   truncated: boolean;
 }
