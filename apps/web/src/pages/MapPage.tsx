@@ -1,0 +1,20 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Eye, Filter, Layers3, LocateFixed, Network, Search } from 'lucide-react';
+import { api } from '../api';
+import { useWorkspace } from '../context';
+import { ErrorNotice, Loading, PageHeader, VerificationBadge } from '../components/ui';
+import { GraphCanvas } from '../components/GraphCanvas';
+
+const relations=[['semantically_similar','#8e6fdb'],['cites','#6e8f87'],['uses_as_baseline','#e28c4b'],['compares_against','#ce6d65'],['evaluates_on','#d9aa3e'],['uses_method','#4a83a8']] as const;
+
+export function MapPage(){
+  const {collectionId}=useWorkspace();const [selectedId,setSelectedId]=useState<string>();const [enabled,setEnabled]=useState(new Set(relations.map(r=>r[0])));
+  const graph=useQuery({queryKey:['graph',collectionId],queryFn:()=>api.graph(collectionId)});const works=useQuery({queryKey:['works',collectionId],queryFn:()=>api.works(collectionId)});
+  const selected=works.data?.items.find(w=>w.id===selectedId);const filtered=graph.data?{...graph.data,edges:graph.data.edges.filter(e=>enabled.has(e.predicate as any))}:undefined;
+  return <div className="page map-page"><PageHeader eyebrow="Evidence map" title="See how this literature fits together" description="Semantic proximity opens the map; citations and evidence-backed relationships explain it." actions={<><button className="button secondary"><LocateFixed size={16}/>Recenter</button><button className="button primary"><Layers3 size={16}/>Save perspective</button></>}/>
+    <div className="map-layout"><aside className="map-filters"><div className="panel-title"><Filter size={15}/><strong>Relationships</strong></div>{relations.map(([name,color])=><label className="relation-toggle" key={name}><input type="checkbox" checked={enabled.has(name)} onChange={()=>setEnabled(v=>{const n=new Set(v);if(n.has(name))n.delete(name);else n.add(name);return n})}/><i style={{background:color}}/>{name.replaceAll('_',' ')}</label>)}<div className="filter-divider"/><div className="panel-title"><Eye size={15}/><strong>Evidence state</strong></div><label className="check-line"><input type="checkbox" defaultChecked/>Verified</label><label className="check-line"><input type="checkbox" defaultChecked/>Inferred <span className="dash-sample"/></label><div className="map-legend"><span><i className="node-swatch primary"/>Focus</span><span><i className="node-swatch"/>Paper</span></div></aside>
+      <section className="map-stage">{graph.isLoading?<Loading label="Laying out the research map…"/>:graph.error?<ErrorNotice error={graph.error}/>:filtered&&filtered.nodes.length?<GraphCanvas graph={filtered} selectedId={selectedId} onSelect={setSelectedId}/>:<div className="map-empty"><Network/><h3>No connected papers yet</h3><p>Add works to this collection and create relationships during discovery.</p></div>}</section>
+      <aside className="detail-panel">{selected?<><div className="detail-kicker">Selected paper</div><h2>{selected.title}</h2><p className="authors">{selected.authors.map(a=>`${a.given} ${a.family}`).join(', ')}</p><VerificationBadge status={selected.verificationStatus}/><p className="detail-abstract">{selected.abstract||'No abstract stored.'}</p><div className="detail-section"><strong>Connections</strong>{filtered?.edges.filter(e=>e.sourceId===selected.id||e.targetId===selected.id).map(e=><div className="mini-edge" key={e.id}><i style={{background:relations.find(r=>r[0]===e.predicate)?.[1]}}/><span>{e.predicate.replaceAll('_',' ')}</span><b>{Math.round(e.confidence*100)}%</b></div>)}</div><div className="detail-actions"><a className="button primary" href={`/ask?work=${selected.id}`}>Ask about this</a><a className="button secondary" href={`/read/${selected.id}`}>Open paper</a></div></>:<div className="detail-placeholder"><Search/><h3>Select a paper</h3><p>Inspect its abstract, versions, evidence, reviews, and notes here.</p></div>}</aside></div>
+  </div>
+}

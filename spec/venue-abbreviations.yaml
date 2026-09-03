@@ -1,0 +1,69 @@
+version: 0.1.0
+normalization:
+  lowercase: true
+  ascii_transliteration: true
+  remove_characters: [space, period, hyphen, apostrophe, slash]
+venues:
+  - canonical_name: IEEE Robotics and Automation Letters
+    abbreviation: ral
+    aliases:
+      - RA-L
+      - IEEE RA-L
+      - IEEE Robotics & Automation Letters
+      - IEEE Robot. Autom. Lett.
+    type: journal
+    identifiers:
+      issn: [2377-3766, 2377-3774]
+  - canonical_name: IEEE Transactions on Robotics
+    abbreviation: tro
+    aliases: [T-RO, IEEE T-RO, IEEE Trans. Robot.]
+    type: journal
+  - canonical_name: The International Journal of Robotics Research
+    abbreviation: ijrr
+    aliases: [IJRR, Int. J. Robot. Res.]
+    type: journal
+  - canonical_name: IEEE International Conference on Robotics and Automation
+    abbreviation: icra
+    aliases: [ICRA, IEEE ICRA]
+    type: conference
+  - canonical_name: IEEE/RSJ International Conference on Intelligent Robots and Systems
+    abbreviation: iros
+    aliases: [IROS, IEEE/RSJ IROS]
+    type: conference
+  - canonical_name: Conference on Robot Learning
+    abbreviation: corl
+    aliases: [CoRL]
+    type: conference
+  - canonical_name: Robotics Science and Systems
+    abbreviation: rss
+    aliases: [RSS, Robotics: Science and Systems]
+    type: conference
+  - canonical_name: Advances in Neural Information Processing Systems
+    abbreviation: neurips
+    aliases: [NeurIPS, NIPS]
+    type: conference
+  - canonical_name: International Conference on Machine Learning
+    abbreviation: icml
+    aliases: [ICML]
+    type: conference
+  - canonical_name: International Conference on Learning Representations
+    abbreviation: iclr
+    aliases: [ICLR]
+    type: conference
+  - canonical_name: ACM International Conference on Mobile Systems Applications and Services
+    abbreviation: mobisys
+    aliases: [MobiSys, ACM MobiSys]
+    type: conference
+  - canonical_name: ACM Conference on Human Factors in Computing Systems
+    abbreviation: chi
+    aliases: [CHI, ACM CHI]
+    type: conference
+  - canonical_name: arXiv
+    abbreviation: arxiv
+    aliases: [CoRR, Computing Research Repository]
+    type: repository
+  - canonical_name: OpenReview
+    abbreviation: openreview
+    aliases: [OpenReview.net]
+    type: repository
+

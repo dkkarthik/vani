@@ -1,0 +1,210 @@
+version: 0.1.0
+evidence_classes:
+  - direct_text
+  - structured_data
+  - computed_graph
+  - model_inference
+  - user_assertion
+verification_states:
+  - verified
+  - user_verified
+  - probable
+  - inferred
+  - disputed
+  - rejected
+predicates:
+  cites:
+    label: cites
+    inverse_label: cited by
+    symmetric: false
+    subject_types: [manifestation]
+    object_types: [manifestation, work]
+    evidence: [direct_text, structured_data, computed_graph]
+    minimum_verification: probable
+  semantic_similar:
+    label: semantically similar
+    inverse_label: semantically similar
+    symmetric: true
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation]
+    evidence: [model_inference, user_assertion]
+    minimum_verification: inferred
+  bibliographically_coupled:
+    label: shares references with
+    inverse_label: shares references with
+    symmetric: true
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation]
+    evidence: [computed_graph]
+    required_attributes: [shared_reference_ids, shared_count, normalized_score]
+    minimum_verification: probable
+  co_cited:
+    label: is co-cited with
+    inverse_label: is co-cited with
+    symmetric: true
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation]
+    evidence: [computed_graph]
+    required_attributes: [co_citing_work_ids, count]
+    minimum_verification: probable
+  extends:
+    label: extends
+    inverse_label: extended by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation]
+    evidence: [direct_text, user_assertion]
+    minimum_verification: probable
+  adapts_method:
+    label: adapts method from
+    inverse_label: method adapted by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation, method]
+    evidence: [direct_text, user_assertion]
+    minimum_verification: probable
+  uses_as_baseline:
+    label: uses as baseline
+    inverse_label: used as baseline by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation, method]
+    evidence: [direct_text, structured_data, user_assertion]
+    required_attributes: [evaluation_location]
+    minimum_verification: probable
+  compares_against:
+    label: compares against
+    inverse_label: compared by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [work, manifestation, method]
+    evidence: [direct_text, structured_data, user_assertion]
+    required_attributes: [comparison_location]
+    minimum_verification: probable
+  reproduces:
+    label: reproduces
+    inverse_label: reproduced by
+    symmetric: false
+    subject_types: [work, manifestation, commentary]
+    object_types: [work, manifestation]
+    evidence: [direct_text, structured_data, user_assertion]
+    required_attributes: [outcome]
+    allowed_attribute_values:
+      outcome: [successful, partial, failed, mixed]
+    minimum_verification: probable
+  supports_claim:
+    label: supports claim
+    inverse_label: supported by
+    symmetric: false
+    subject_types: [work, manifestation, evidence_span]
+    object_types: [claim]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  contradicts_claim:
+    label: contradicts claim
+    inverse_label: contradicted by
+    symmetric: false
+    subject_types: [work, manifestation, evidence_span]
+    object_types: [claim]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  evaluates_on:
+    label: evaluates on
+    inverse_label: evaluated by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [dataset, benchmark, task, environment, population]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  uses_method:
+    label: uses method
+    inverse_label: method used by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [method]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  introduces_method:
+    label: introduces method
+    inverse_label: introduced by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [method]
+    evidence: [direct_text, user_assertion]
+    required_attributes: [novelty_basis]
+    minimum_verification: probable
+  introduces_dataset:
+    label: introduces dataset
+    inverse_label: introduced by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [dataset]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  uses_metric:
+    label: uses metric
+    inverse_label: metric used by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [metric]
+    evidence: [direct_text, structured_data, user_assertion]
+    minimum_verification: probable
+  addresses_task:
+    label: addresses task
+    inverse_label: addressed by
+    symmetric: false
+    subject_types: [work, manifestation]
+    object_types: [task]
+    evidence: [direct_text, user_assertion]
+    minimum_verification: probable
+  critiques:
+    label: critiques
+    inverse_label: critiqued by
+    symmetric: false
+    subject_types: [review, commentary, critique]
+    object_types: [work, manifestation, claim, method, experiment, figure, table]
+    evidence: [direct_text]
+    required_attributes: [category]
+    minimum_verification: probable
+  responds_to:
+    label: responds to
+    inverse_label: receives response from
+    symmetric: false
+    subject_types: [author_response, commentary]
+    object_types: [review, critique, commentary]
+    evidence: [direct_text, structured_data]
+    minimum_verification: probable
+  addresses_critique:
+    label: addresses critique
+    inverse_label: addressed by
+    symmetric: false
+    subject_types: [revision, author_response]
+    object_types: [critique]
+    evidence: [direct_text, structured_data, model_inference, user_assertion]
+    required_attributes: [resolution_status]
+    minimum_verification: inferred
+  disputes_critique:
+    label: disputes critique
+    inverse_label: disputed by
+    symmetric: false
+    subject_types: [author_response, commentary]
+    object_types: [critique]
+    evidence: [direct_text]
+    minimum_verification: probable
+  editor_adjudicates:
+    label: adjudicates
+    inverse_label: adjudicated by
+    symmetric: false
+    subject_types: [meta_review, decision]
+    object_types: [critique, review, author_response]
+    evidence: [direct_text]
+    minimum_verification: probable
+  suggests_related_work:
+    label: suggests related work
+    inverse_label: suggested by
+    symmetric: false
+    subject_types: [review, commentary]
+    object_types: [work, manifestation]
+    evidence: [direct_text]
+    minimum_verification: probable
+

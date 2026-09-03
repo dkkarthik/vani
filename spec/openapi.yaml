@@ -1,0 +1,524 @@
+openapi: 3.1.0
+info:
+  title: VANI Application API
+  version: 0.1.0
+  description: Local-first scholarly discovery, library, graph, and grounded Q&A API.
+servers:
+  - url: http://127.0.0.1:8080/api/v1
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, enum: [ok, degraded]}
+                  components: {type: object, additionalProperties: true}
+  /works:
+    get:
+      operationId: listWorks
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: query
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: Page of works
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkPage'}
+  /works/resolve:
+    post:
+      operationId: resolveWork
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input: {type: string}
+                connector_preferences:
+                  type: array
+                  items: {type: string}
+      responses:
+        '202':
+          description: Resolution job accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobReference'}
+        '400': {$ref: '#/components/responses/Error'}
+  /works/{workId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkId'
+    get:
+      operationId: getWork
+      responses:
+        '200':
+          description: Canonical work
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Work'}
+        '404': {$ref: '#/components/responses/Error'}
+    patch:
+      operationId: updateWork
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '200':
+          description: Updated work
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Work'}
+        '409': {$ref: '#/components/responses/Error'}
+  /imports:
+    post:
+      operationId: createImport
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input_type]
+              properties:
+                input_type: {type: string, enum: [doi, url, bibtex, biblatex, ris, csl_json, object]}
+                value: {type: [string, 'null']}
+                object_hash: {type: [string, 'null']}
+                target_collection_id: {type: [string, 'null'], format: uuid}
+      responses:
+        '202':
+          description: Import accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobReference'}
+  /collections:
+    get:
+      operationId: listCollections
+      responses:
+        '200':
+          description: Collections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Collection'}
+    post:
+      operationId: createCollection
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CollectionCreate'}
+      responses:
+        '201':
+          description: Created collection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Collection'}
+  /collections/{collectionId}/members:
+    parameters:
+      - $ref: '#/components/parameters/CollectionId'
+    get:
+      operationId: listCollectionMembers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Collection members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/CollectionMember'}
+                  next_cursor: {type: [string, 'null']}
+    post:
+      operationId: addCollectionMembers
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [work_ids]
+              properties:
+                work_ids:
+                  type: array
+                  minItems: 1
+                  items: {type: string, format: uuid}
+                status: {type: string, default: inbox}
+      responses:
+        '200':
+          description: Memberships created or retained idempotently
+  /collections/{collectionId}/exports:
+    parameters:
+      - $ref: '#/components/parameters/CollectionId'
+    post:
+      operationId: exportCollection
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExportRequest'}
+      responses:
+        '202':
+          description: Export validation/generation accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobReference'}
+        '409': {$ref: '#/components/responses/Error'}
+  /search:
+    post:
+      operationId: search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SearchRequest'}
+      responses:
+        '200':
+          description: Ranked search results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results, ranker_version]
+                properties:
+                  results:
+                    type: array
+                    items: {$ref: '#/components/schemas/SearchResult'}
+                  ranker_version: {type: string}
+  /graph/neighborhood:
+    post:
+      operationId: getGraphNeighborhood
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GraphRequest'}
+      responses:
+        '200':
+          description: Bounded graph projection
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GraphProjection'}
+  /conversations:
+    post:
+      operationId: createConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope]
+              properties:
+                title: {type: [string, 'null']}
+                scope: {$ref: '#/components/schemas/Scope'}
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Conversation'}
+  /conversations/{conversationId}/messages:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: askVani
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AskRequest'}
+      responses:
+        '202':
+          description: Answer generation accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobReference'}
+  /answers/{answerId}:
+    parameters:
+      - name: answerId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getAnswer
+      responses:
+        '200':
+          description: Grounded answer
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Answer'}
+        '404': {$ref: '#/components/responses/Error'}
+  /jobs/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getJob
+      responses:
+        '200':
+          description: Job state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Job'}
+components:
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 8, maxLength: 200}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: {type: string}
+    WorkId:
+      name: workId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    CollectionId:
+      name: collectionId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  schemas:
+    Work:
+      type: object
+      required: [id, canonical_title, verification_status, manifestations]
+      properties:
+        id: {type: string, format: uuid}
+        canonical_title: {type: string}
+        work_type: {type: string}
+        verification_status: {type: string}
+        preferred_manifestation_id: {type: [string, 'null'], format: uuid}
+        manifestations:
+          type: array
+          items: {$ref: '#/components/schemas/Manifestation'}
+        version: {type: integer}
+    Manifestation:
+      type: object
+      required: [id, type, title, authors, verification_status]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string}
+        title: {type: string}
+        authors:
+          type: array
+          items: {type: string}
+        venue: {type: [string, 'null']}
+        issued_year: {type: [integer, 'null']}
+        doi: {type: [string, 'null']}
+        citation_key: {type: [string, 'null']}
+        verification_status: {type: string}
+    WorkPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Work'}
+        next_cursor: {type: [string, 'null']}
+    CollectionCreate:
+      type: object
+      required: [name, type]
+      properties:
+        name: {type: string, minLength: 1}
+        description: {type: [string, 'null']}
+        type: {type: string, enum: [manual, smart]}
+        parent_id: {type: [string, 'null'], format: uuid}
+        query_definition: {type: [object, 'null'], additionalProperties: true}
+    Collection:
+      allOf:
+        - $ref: '#/components/schemas/CollectionCreate'
+        - type: object
+          required: [id]
+          properties:
+            id: {type: string, format: uuid}
+            frozen_at: {type: [string, 'null'], format: date-time}
+    CollectionMember:
+      type: object
+      required: [work, status]
+      properties:
+        work: {$ref: '#/components/schemas/Work'}
+        status: {type: string}
+        priority: {type: [integer, 'null']}
+        rationale: {type: [string, 'null']}
+    ExportRequest:
+      type: object
+      required: [format]
+      properties:
+        format: {type: string, enum: [bibtex, biblatex, csl_json, ris, vani_json]}
+        include_descendants: {type: boolean, default: true}
+        verification_threshold: {type: string, default: verified_with_minor_differences}
+        preferred_manifestation_policy: {type: string, default: best_verified}
+        encoding_mode: {type: string, enum: [utf8, latex_escaped], default: utf8}
+        include_abstracts: {type: boolean, default: false}
+        include_keywords: {type: boolean, default: true}
+        include_file_paths: {type: boolean, default: false}
+    Scope:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [manifestation, selected_manifestations, collection, collection_tree, library]
+        ids:
+          type: array
+          items: {type: string, format: uuid}
+    SearchRequest:
+      type: object
+      required: [query, mode, scope]
+      properties:
+        query: {type: string, minLength: 1}
+        mode: {type: string, enum: [lexical, semantic, hybrid, graph]}
+        scope: {$ref: '#/components/schemas/Scope'}
+        filters: {type: object, additionalProperties: true}
+        limit: {type: integer, minimum: 1, maximum: 200, default: 50}
+    SearchResult:
+      type: object
+      required: [work, rank, score, features, why_shown]
+      properties:
+        work: {$ref: '#/components/schemas/Work'}
+        rank: {type: integer, minimum: 1}
+        score: {type: number}
+        features: {type: object, additionalProperties: {type: number}}
+        why_shown: {type: array, items: {type: string}}
+    GraphRequest:
+      type: object
+      required: [seed_ids, max_nodes, max_edges]
+      properties:
+        seed_ids: {type: array, minItems: 1, items: {type: string, format: uuid}}
+        predicates: {type: array, items: {type: string}}
+        max_depth: {type: integer, minimum: 1, maximum: 3, default: 1}
+        max_nodes: {type: integer, minimum: 1, maximum: 5000}
+        max_edges: {type: integer, minimum: 1, maximum: 10000}
+    GraphProjection:
+      type: object
+      required: [nodes, edges, truncated]
+      properties:
+        nodes: {type: array, items: {type: object, additionalProperties: true}}
+        edges: {type: array, items: {type: object, additionalProperties: true}}
+        truncated: {type: boolean}
+        truncation_reason: {type: [string, 'null']}
+    Conversation:
+      type: object
+      required: [id, scope]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: [string, 'null']}
+        scope: {$ref: '#/components/schemas/Scope'}
+    AskRequest:
+      type: object
+      required: [question]
+      properties:
+        question: {type: string, minLength: 1}
+        scope_override: {oneOf: [{$ref: '#/components/schemas/Scope'}, {type: 'null'}]}
+        include_notes: {type: boolean, default: true}
+        include_reviews: {type: boolean, default: true}
+        external_search: {type: boolean, default: false}
+        evidence_policy: {type: string, enum: [verified_only, verified_or_direct, include_inference], default: verified_or_direct}
+    Answer:
+      type: object
+      required: [id, status, scope_snapshot, claims]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [queued, retrieving, generating, validating, complete, failed]}
+        scope_snapshot: {type: object, additionalProperties: true}
+        markdown: {type: [string, 'null']}
+        claims:
+          type: array
+          items:
+            type: object
+            required: [id, text, support_status, evidence]
+            properties:
+              id: {type: string, format: uuid}
+              text: {type: string}
+              support_status: {type: string, enum: [directly_supported, supported_by_multiple_sources, partially_supported, source_disagreement, inferred, unsupported]}
+              evidence: {type: array, items: {type: object, additionalProperties: true}}
+        limitations: {type: array, items: {type: string}}
+        model_provenance: {type: object, additionalProperties: true}
+    JobReference:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: {type: string, format: uuid}
+        status: {type: string}
+    Job:
+      allOf:
+        - $ref: '#/components/schemas/JobReference'
+        - type: object
+          properties:
+            progress: {type: number, minimum: 0, maximum: 1}
+            stage: {type: [string, 'null']}
+            result: {type: [object, 'null'], additionalProperties: true}
+            error: {oneOf: [{$ref: '#/components/schemas/Error'}, {type: 'null'}]}
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: {$ref: '#/components/schemas/Error'}
+    Error:
+      type: object
+      required: [code, message, retryable, request_id]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        retryable: {type: boolean}
+        details: {type: object, additionalProperties: true}
+        request_id: {type: string}
+

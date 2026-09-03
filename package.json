@@ -1,0 +1,29 @@
+{
+  "name": "vani",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VANI — Visualizing Academic Networks and Ideas",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @vani/api\" \"npm run dev -w @vani/web\"",
+    "build": "npm run build -w @vani/shared && npm run build -w @vani/api && npm run build -w @vani/web",
+    "test": "npm run build -w @vani/shared && npm run test -w @vani/api && npm run test -w @vani/web",
+    "typecheck": "npm run typecheck -w @vani/shared && npm run typecheck -w @vani/api && npm run typecheck -w @vani/web",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "db:migrate": "npm run db:migrate -w @vani/api",
+    "db:seed": "npm run db:seed -w @vani/api",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {"node": ">=22"},
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.43.0"
+  }
+}
