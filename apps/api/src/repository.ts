@@ -140,7 +140,8 @@ export class Repository {
     if (collectionId) { values.push(collectionId); membershipJoin = 'JOIN collection_membership cm ON cm.work_id=w.id'; filters.push(`cm.collection_id=$${values.length}`); }
     if (workId) { values.push(workId); filters.push(`(w.id=$${values.length} OR EXISTS(SELECT 1 FROM typed_relationship rr WHERE (rr.source_work_id=$${values.length} AND rr.target_work_id=w.id) OR (rr.target_work_id=$${values.length} AND rr.source_work_id=w.id)))`); }
     values.push(limit + 1);
-    const rows = await query<any>(`SELECT w.id,w.title,w.year,v.abbreviation AS venue,cm.status FROM work w ${membershipJoin}
+    const membershipStatus = collectionId ? 'cm.status' : 'NULL::text AS status';
+    const rows = await query<any>(`SELECT w.id,w.title,w.year,v.abbreviation AS venue,${membershipStatus} FROM work w ${membershipJoin}
       LEFT JOIN venue v ON v.id=w.venue_id WHERE ${filters.join(' AND ')} ORDER BY w.year DESC NULLS LAST LIMIT $${values.length}`, values);
     const selected = rows.rows.slice(0, limit);
     const ids = selected.map((row) => row.id);
