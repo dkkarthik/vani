@@ -1,23 +1,401 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FolderPlus, Inbox, LayoutList, MoreHorizontal, Network, Search } from 'lucide-react';
-import { api } from '../api';
-import { useWorkspace } from '../context';
-import { EmptyState, ErrorNotice, Loading, Modal, PageHeader, VerificationBadge } from '../components/ui';
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CollectionWork, DiscoverySeed } from "@vani/shared";
+import { Download, FolderPlus, Inbox, Search } from "lucide-react";
+import { api } from "../api";
+import { useWorkspace } from "../context";
+import {
+  EmptyState,
+  ErrorNotice,
+  Loading,
+  Modal,
+  PageHeader,
+  VerificationBadge,
+} from "../components/ui";
+import { CollectionSeedForm } from "../components/CollectionSeedForm";
+import { FirstPassReport } from "../components/FirstPassReport";
 
-export function CollectionPage(){
-  const queryClient=useQueryClient();const {collectionId,selected,toggle}=useWorkspace();const [search,setSearch]=useState('');const [showCreate,setShowCreate]=useState(false);const [view,setView]=useState<'table'|'cards'>('table');
-  const collections=useQuery({queryKey:['collections'],queryFn:api.collections});
-  const works=useQuery({queryKey:['works',collectionId],queryFn:()=>api.works(collectionId),enabled:Boolean(collectionId)});
-  const active=collections.data?.items.find(c=>c.id===collectionId);const filtered=works.data?.items.filter(w=>w.title.toLowerCase().includes(search.toLowerCase())||w.authors.some(a=>a.family.toLowerCase().includes(search.toLowerCase())))??[];
-  const create=useMutation({mutationFn:api.createCollection,onSuccess:()=>{queryClient.invalidateQueries({queryKey:['collections']});setShowCreate(false)}});
-  const status=useMutation({mutationFn:({workId,value}:{workId:string;value:string})=>api.updateStatus(collectionId!,workId,value),onSuccess:()=>queryClient.invalidateQueries({queryKey:['works',collectionId]})});
-  async function exportCollection(){if(!collectionId)return;const response=await api.exportBibtex(collectionId);if(!response.ok)return;const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${active?.name??'vani'}.bib`;link.click();URL.revokeObjectURL(url)}
-  return <div className="page collection-page"><PageHeader eyebrow="Research workspace" title={active?.name??'Collections'} description={active?.description||'Organize papers into a durable, evidence-rich research workspace.'} actions={<><button className="button secondary" onClick={()=>setShowCreate(true)}><FolderPlus size={16}/>New collection</button><button className="button primary" disabled={!collectionId} onClick={exportCollection}><Download size={16}/>Export BibTeX</button></>}/>
-    <div className="stats-row"><div><strong>{active?.memberCount??0}</strong><span>papers</span></div><div><strong>{filtered.filter(w=>w.verificationStatus.startsWith('verified')).length}</strong><span>verified</span></div><div><strong>0</strong><span>needs attention</span></div><div className="stat-accent"><strong>{selected.length}</strong><span>selected</span></div></div>
-    <div className="toolbar"><label className="search-field"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Filter by title or author…"/></label><div className="segmented"><button className={view==='table'?'active':''} onClick={()=>setView('table')}><LayoutList size={15}/>List</button><button className={view==='cards'?'active':''} onClick={()=>setView('cards')}><Network size={15}/>Signals</button></div></div>
-    {works.isLoading?<Loading/>:works.error?<ErrorNotice error={works.error}/>:!collectionId?<EmptyState icon={<Inbox/>} title="Create your first collection" body="Collections hold papers, annotations, questions, and discovery profiles together." action={<button className="button primary" onClick={()=>setShowCreate(true)}>Create collection</button>}/>:filtered.length===0?<EmptyState icon={<Inbox/>} title="This collection is ready for a seed" body="Add a paper, DOI, keyword, or idea from Discover."/>:
-      <div className={`paper-table ${view}`} role="table" aria-label="Collection papers"><div className="paper-row paper-head" role="row"><span/><span>Paper</span><span>Year</span><span>Status</span><span>Verification</span><span>Key</span><span/></div>{filtered.map(work=><div className={`paper-row ${selected.some(w=>w.id===work.id)?'selected':''}`} role="row" key={work.id}><input aria-label={`Select ${work.title}`} type="checkbox" checked={selected.some(w=>w.id===work.id)} onChange={()=>toggle(work)}/><div><a href={`/read/${work.id}`} className="paper-title">{work.title}</a><small>{work.authors.map(a=>a.family).join(', ')||'Unknown author'} · {work.venue}</small></div><span>{work.year??'—'}</span><select aria-label="Reading status" defaultValue="inbox" onChange={e=>status.mutate({workId:work.id,value:e.target.value})}><option value="inbox">Inbox</option><option value="to_read">To read</option><option value="reading">Reading</option><option value="read">Read</option><option value="foundational">Foundational</option><option value="cited">Cited</option></select><VerificationBadge status={work.verificationStatus}/><code>{work.citationKey}</code><button className="icon-button" aria-label="More actions"><MoreHorizontal size={17}/></button></div>)}</div>}
-    {showCreate&&<Modal title="New collection" onClose={()=>setShowCreate(false)}><form className="stack-form" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);create.mutate({name:String(data.get('name')),description:String(data.get('description'))})}}><label>Name<input required name="name" autoFocus placeholder="e.g. Terrain representations"/></label><label>Description<textarea name="description" rows={3} placeholder="What question does this collection support?"/></label><button className="button primary" disabled={create.isPending}>{create.isPending?'Creating…':'Create collection'}</button></form></Modal>}
-  </div>
+export function CollectionPage() {
+  const client = useQueryClient();
+  const { collectionId, setCollectionId, selected, toggle } = useWorkspace();
+  const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [showSeed, setShowSeed] = useState(false);
+  const [name, setName] = useState("");
+  const [report, setReport] = useState<CollectionWork>();
+  const [onlyNew, setOnlyNew] = useState(false);
+  // Preserve NEW badges for this visit after acknowledging their successful display.
+  const visit = useRef<{
+    id?: string;
+    newIds: Set<string>;
+    acknowledged: Set<string>;
+  }>({ newIds: new Set(), acknowledged: new Set() });
+  if (visit.current.id !== collectionId)
+    visit.current = {
+      id: collectionId,
+      newIds: new Set(),
+      acknowledged: new Set(),
+    };
+  const collections = useQuery({
+    queryKey: ["collections"],
+    queryFn: api.collections,
+    refetchInterval: 15000,
+  });
+  const works = useQuery({
+    queryKey: ["collection-members", collectionId],
+    queryFn: () => api.collectionMembers(collectionId!),
+    enabled: Boolean(collectionId),
+    refetchInterval: 15000,
+  });
+  const active = collections.data?.items.find(
+    (collection) => collection.id === collectionId,
+  );
+  if (!works.isFetching)
+    for (const work of works.data?.items ?? [])
+      if (work.isNew) visit.current.newIds.add(work.id);
+  const filtered = (works.data?.items ?? []).filter(
+    (work) =>
+      (!onlyNew || visit.current.newIds.has(work.id)) &&
+      (work.title.toLowerCase().includes(search.toLowerCase()) ||
+        work.authors.some((author) =>
+          author.family.toLowerCase().includes(search.toLowerCase()),
+        )),
+  );
+  const visibleIds = filtered.map((work) => work.id).join(",");
+  useEffect(() => {
+    if (!collectionId || !visibleIds || works.isFetching) return;
+    const state = visit.current;
+    const ids = visibleIds
+      .split(",")
+      .filter((id) => !state.acknowledged.has(id));
+    if (!ids.length) return;
+    const acknowledge = () => {
+      if (document.visibilityState === "hidden") return;
+      ids.forEach((id) => state.acknowledged.add(id));
+      void api
+        .seen(collectionId, ids)
+        .then(() => client.invalidateQueries({ queryKey: ["collections"] }))
+        .catch(() => ids.forEach((id) => state.acknowledged.delete(id)));
+    };
+    acknowledge();
+    document.addEventListener("visibilitychange", acknowledge);
+    return () => document.removeEventListener("visibilitychange", acknowledge);
+  }, [collectionId, visibleIds, works.dataUpdatedAt, works.isFetching, client]);
+  const save = useMutation({
+    mutationFn: async (seed: DiscoverySeed) => {
+      let id = collectionId;
+      if (showCreate) {
+        const created = await api.createCollection({ name: name.trim() });
+        id = created.id;
+        setCollectionId(id);
+        setShowCreate(false);
+        setShowSeed(true);
+      }
+      if (!id) throw new Error("Choose a collection first");
+      return api.configureDiscovery(id, seed);
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["collections"] });
+      client.invalidateQueries({ queryKey: ["collection-members"] });
+      setShowSeed(false);
+    },
+    onError: () => client.invalidateQueries({ queryKey: ["collections"] }),
+  });
+  const refresh = useMutation({
+    mutationFn: () => api.refreshCollection(collectionId!),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["collections"] }),
+  });
+  const retry = useMutation({
+    mutationFn: (workId: string) => api.retryFirstPass(collectionId!, workId),
+    onSuccess: () => {
+      setReport(undefined);
+      client.invalidateQueries({ queryKey: ["collection-members"] });
+    },
+  });
+  const status = useMutation({
+    mutationFn: ({ workId, value }: { workId: string; value: string }) =>
+      api.updateStatus(collectionId!, workId, value),
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: ["collection-members", collectionId],
+      }),
+  });
+  async function exportCollection() {
+    if (!collectionId) return;
+    const response = await api.exportBibtex(collectionId);
+    if (!response.ok) return;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${active?.name ?? "vani"}.bib`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  return (
+    <div className="page collection-page">
+      <PageHeader
+        eyebrow="Research workspace"
+        title={active?.name ?? "Collections"}
+        description={
+          active?.description ||
+          "A living collection of related papers and evidence-backed first passes."
+        }
+        actions={
+          <>
+            <button
+              className="button secondary"
+              onClick={() => {
+                setName("");
+                save.reset();
+                setShowCreate(true);
+              }}
+            >
+              <FolderPlus size={16} />
+              New collection
+            </button>
+            <button
+              className="button primary"
+              disabled={!collectionId}
+              onClick={exportCollection}
+            >
+              <Download size={16} />
+              Export BibTeX
+            </button>
+          </>
+        }
+      />
+      {collectionId && (
+        <section className="discovery-summary">
+          <div>
+            <strong>
+              {active?.discovery?.topic || "Seed this collection"}
+            </strong>
+            <p>
+              {active?.discovery
+                ? `${active.discovery.enabled ? "Daily" : "Paused"} · ${String(active.discovery.hour).padStart(2, "0")}:00 ${active.discovery.timezone} · seeded from ${active.discovery.mode}`
+                : "Choose a topic or seed papers to start daily discovery."}
+            </p>
+            <small>
+              Last search:{" "}
+              {active?.lastDiscoveryAt
+                ? new Date(active.lastDiscoveryAt).toLocaleString()
+                : "Not yet"}{" "}
+              · Next:{" "}
+              {active?.discovery?.enabled && active.nextDiscoveryAt
+                ? new Date(active.nextDiscoveryAt).toLocaleString()
+                : "Not scheduled"}
+            </small>
+            {active?.discoveryError && (
+              <p role="alert">{active.discoveryError}</p>
+            )}
+          </div>
+          <button
+            className="button secondary"
+            onClick={() => {
+              save.reset();
+              setShowSeed(true);
+            }}
+          >
+            {active?.discovery ? "Edit discovery" : "Configure discovery"}
+          </button>
+          <button
+            className="button secondary"
+            disabled={!active?.discovery?.enabled || refresh.isPending}
+            onClick={() => refresh.mutate()}
+          >
+            Search now
+          </button>
+        </section>
+      )}
+      {refresh.isSuccess && (
+        <p role="status">Search queued; the worker checks every minute.</p>
+      )}
+      {refresh.error && <ErrorNotice error={refresh.error} />}{" "}
+      {status.error && <ErrorNotice error={status.error} />}
+      <div className="stats-row">
+        <div>
+          <strong>{active?.memberCount ?? 0}</strong>
+          <span>papers</span>
+        </div>
+        <div>
+          <strong>{visit.current.newIds.size}</strong>
+          <span>new this visit</span>
+        </div>
+        <div>
+          <strong>
+            {works.data?.items.filter(
+              (work) => work.firstPass?.status === "full_text",
+            ).length ?? 0}
+          </strong>
+          <span>full-text first passes</span>
+        </div>
+        <div>
+          <strong>{selected.length}</strong>
+          <span>selected</span>
+        </div>
+      </div>
+      <div className="toolbar">
+        <label className="search-field">
+          <Search size={16} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Filter by title or author…"
+          />
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={onlyNew}
+            onChange={(event) => setOnlyNew(event.target.checked)}
+          />{" "}
+          New since last visit
+        </label>
+      </div>
+      {works.isLoading ? (
+        <Loading />
+      ) : works.error ? (
+        <ErrorNotice error={works.error} />
+      ) : !filtered.length ? (
+        <EmptyState
+          icon={<Inbox />}
+          title={
+            collectionId
+              ? "No matching papers yet"
+              : "Create your first collection"
+          }
+          body="Start with a focused topic or a few seed papers. Discovery and first passes run in the background."
+        />
+      ) : (
+        <div
+          className="paper-table"
+          role="table"
+          aria-label="Collection papers"
+        >
+          <div className="paper-row paper-head" role="row">
+            <span />
+            <span>Paper</span>
+            <span>Year</span>
+            <span>Status</span>
+            <span>Verification</span>
+            <span>Key</span>
+            <span />
+          </div>
+          {filtered.map((work) => (
+            <div
+              className={`paper-row ${visit.current.newIds.has(work.id) ? "new-paper" : ""}`}
+              role="row"
+              key={work.id}
+            >
+              <input
+                aria-label={`Select ${work.title}`}
+                type="checkbox"
+                checked={selected.some((item) => item.id === work.id)}
+                onChange={() => toggle(work)}
+              />
+              <div>
+                {visit.current.newIds.has(work.id) && (
+                  <span className="new-badge">NEW</span>
+                )}{" "}
+                <a href={`/read/${work.id}`} className="paper-title">
+                  {work.title}
+                </a>
+                <small>
+                  {work.authors.map((author) => author.family).join(", ")} ·{" "}
+                  {work.venue}
+                </small>
+                <button
+                  className="first-pass-link"
+                  onClick={() => {
+                    retry.reset();
+                    setReport(work);
+                  }}
+                >
+                  First pass ·{" "}
+                  {work.firstPass?.status.replaceAll("_", " ") ?? "queued"}
+                </button>
+                {work.firstPass && (
+                  <p className="novelty-preview">{work.firstPass.novelty}</p>
+                )}
+              </div>
+              <span>{work.year ?? "—"}</span>
+              <select
+                aria-label={`Reading status for ${work.title}`}
+                value={work.status}
+                onChange={(event) =>
+                  status.mutate({ workId: work.id, value: event.target.value })
+                }
+              >
+                {[
+                  "inbox",
+                  "to_read",
+                  "skimming",
+                  "reading",
+                  "read",
+                  "foundational",
+                  "cited",
+                  "rejected",
+                  "archived",
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {value.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+              <VerificationBadge status={work.verificationStatus} />
+              <code>{work.citationKey}</code>
+              <span />
+            </div>
+          ))}
+        </div>
+      )}
+      {(showCreate || showSeed) && (
+        <Modal
+          title={showCreate ? "New living collection" : "Collection discovery"}
+          onClose={() => {
+            if (!save.isPending) {
+              setShowCreate(false);
+              setShowSeed(false);
+            }
+          }}
+        >
+          {showCreate && (
+            <label className="collection-name">
+              Collection name
+              <input
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoFocus
+                placeholder="e.g. Active subterranean mapping"
+              />
+            </label>
+          )}
+          <CollectionSeedForm
+            initial={showCreate ? undefined : active?.discovery}
+            onSave={(seed) => {
+              if (showCreate && !name.trim()) return;
+              save.mutate(seed);
+            }}
+            pending={save.isPending}
+            disabled={showCreate && !name.trim()}
+            error={save.error}
+          />
+        </Modal>
+      )}
+      {report && (
+        <Modal title={report.title} onClose={() => setReport(undefined)}>
+          <FirstPassReport report={report.firstPass} />
+          {retry.error && <ErrorNotice error={retry.error} />}
+          <button
+            className="button secondary"
+            disabled={retry.isPending || !active?.discovery?.enabled}
+            onClick={() => retry.mutate(report.id)}
+          >
+            Retry first pass
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
 }

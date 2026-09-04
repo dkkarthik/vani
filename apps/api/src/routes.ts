@@ -8,6 +8,8 @@ import { query } from './db.js';
 import { ObjectStore } from './object-store.js';
 import { Repository } from './repository.js';
 import { answerQuestion } from './ask.js';
+import { DiscoverySeed } from '@vani/shared';
+import { acknowledgeMembers, collectionMembers, configureCollection } from './collection-discovery.js';
 
 const Id = z.string().uuid();
 const workInput = z.object({ title: z.string().min(1), abstract: z.string().optional(), year: z.number().int().min(1000).max(3000).nullable().optional(),
@@ -38,7 +40,28 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
     const input = z.object({ name: z.string().min(1), description: z.string().optional(), parentId: z.string().uuid().nullable().optional() }).parse(request.body);
     return reply.code(201).send(await repository.createCollection(input));
   });
-  app.get('/api/v1/collections/:id/members', async (request) => ({ items: await repository.listWorks({ collectionId: Id.parse((request.params as any).id) }) }));
+  app.get('/api/v1/collections/:id/members', async (request) => collectionMembers(repository,Id.parse((request.params as any).id)));
+  app.post('/api/v1/collections/:id/discovery', async request => {
+    const id=Id.parse((request.params as any).id);
+    return configureCollection(repository,id,DiscoverySeed.parse(request.body));
+  });
+  app.post('/api/v1/collections/:id/seen', async (request,reply) => {
+    const id=Id.parse((request.params as any).id);
+    const {workIds}=z.object({workIds:z.array(Id).max(500)}).parse(request.body);
+    await acknowledgeMembers(id,workIds);return reply.code(204).send();
+  });
+  app.post('/api/v1/collections/:id/refresh', async (request,reply) => {
+    const id=Id.parse((request.params as any).id);
+    const result=await query("UPDATE collection SET next_discovery_at=now() WHERE id=$1 AND deleted_at IS NULL AND discovery->>'enabled'='true' RETURNING id",[id]);
+    if(!result.rowCount) return reply.code(409).send({error:{message:'Configure and enable discovery first.'}});
+    return reply.code(202).send({status:'queued'});
+  });
+  app.post('/api/v1/collections/:id/members/:workId/first-pass/retry', async (request,reply) => {
+    const {id,workId}=z.object({id:Id,workId:Id}).parse(request.params);
+    await query('DELETE FROM paper_first_pass WHERE collection_id=$1 AND work_id=$2',[id,workId]);
+    await query("UPDATE collection SET next_discovery_at=now() WHERE id=$1 AND discovery->>'enabled'='true'",[id]);
+    return reply.code(202).send({status:'queued'});
+  });
   app.post('/api/v1/collections/:id/members', async (request) => {
     const id = Id.parse((request.params as any).id); const { workIds } = z.object({ workIds: z.array(z.string().uuid()).min(1) }).parse(request.body);
     return { items: await repository.addToCollection(id, workIds) };
@@ -98,6 +121,8 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
     if (file.mimetype !== 'application/pdf') return reply.code(415).send({ error: { code: 'VALIDATION', message: 'Only PDF attachments are accepted', retryable: false, request_id: request.id } });
     const stored = await objects.put(await file.toBuffer(), file.mimetype); const id = uuidv7();
     await query('INSERT INTO attachment(id,work_id,object_hash,filename) VALUES($1,$2,$3,$4)', [id, workId, stored.hash, file.filename]);
+    await query("DELETE FROM paper_first_pass WHERE work_id=$1 AND report->>'status'<>'full_text'",[workId]);
+    await query("UPDATE collection SET next_discovery_at=now() WHERE discovery->>'enabled'='true' AND id IN (SELECT collection_id FROM collection_membership WHERE work_id=$1)",[workId]);
     return reply.code(201).send({ id, workId, objectHash: stored.hash, filename: file.filename });
   });
   app.get('/api/v1/works/:id/attachments', async (request) => {

@@ -40,6 +40,8 @@ npm run check
 
 See [Developer guide](docs/13-developer-guide.md) for architecture, configuration, privacy boundaries, and release status.
 
+See [Living collections](docs/14-living-collections.md) for topic/paper seeding, daily discovery, NEW markers, and Keshav first-pass reports.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:

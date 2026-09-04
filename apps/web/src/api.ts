@@ -1,4 +1,4 @@
-import type { Answer, Collection, GraphProjection, SearchResult, Work } from '@vani/shared';
+import type { Answer, Collection, CollectionWork, DiscoverySeed, GraphProjection, SearchResult, Work } from '@vani/shared';
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
@@ -16,6 +16,11 @@ export const api = {
   work: (id: string) => request<Work>(`/works/${id}`),
   addWork: (input: Partial<Work>) => request<Work>('/works', { method: 'POST', body: JSON.stringify(input) }),
   collections: () => request<{items:Collection[]}>('/collections'),
+  collectionMembers: (id:string) => request<{items:CollectionWork[]}>(`/collections/${id}/members`),
+  configureDiscovery: (id:string,seed:DiscoverySeed) => request<DiscoverySeed>(`/collections/${id}/discovery`,{method:'POST',body:JSON.stringify(seed)}),
+  seen: async (id:string,workIds:string[]) => {for(let index=0;index<workIds.length;index+=500)await request(`/collections/${id}/seen`,{method:'POST',body:JSON.stringify({workIds:workIds.slice(index,index+500)})});},
+  refreshCollection: (id:string) => request(`/collections/${id}/refresh`,{method:'POST'}),
+  retryFirstPass: (id:string,workId:string) => request(`/collections/${id}/members/${workId}/first-pass/retry`,{method:'POST'}),
   createCollection: (input: {name:string;description?:string}) => request<Collection>('/collections', { method:'POST',body:JSON.stringify(input) }),
   addMembers: (collectionId:string,workIds:string[]) => request(`/collections/${collectionId}/members`,{method:'POST',body:JSON.stringify({workIds})}),
   updateStatus: (collectionId:string,workId:string,status:string) => request(`/collections/${collectionId}/members/${workId}`,{method:'PATCH',body:JSON.stringify({status})}),

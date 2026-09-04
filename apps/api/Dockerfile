@@ -9,6 +9,7 @@ COPY packages/shared packages/shared
 RUN npm run build -w @vani/shared && npm run build -w @vani/api
 
 FROM node:22-alpine
+RUN apk add --no-cache poppler-utils
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules

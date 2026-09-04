@@ -47,14 +47,15 @@ export interface WorkInput {
 export class Repository {
   async health() { const result = await query<{ now: Date }>('SELECT now()'); return result.rows[0]!.now; }
 
-  async listWorks({ q = '', collectionId, limit = 100 }: { q?: string; collectionId?: string; limit?: number } = {}) {
+  async listWorks({ q = '', collectionId, limit = 100, offset = 0 }: { q?: string; collectionId?: string; limit?: number; offset?: number } = {}) {
     const values: unknown[] = [];
     const where = ['w.deleted_at IS NULL'];
     let join = '';
     if (collectionId) { values.push(collectionId); join = 'JOIN collection_membership cm_filter ON cm_filter.work_id = w.id'; where.push(`cm_filter.collection_id = $${values.length}`); }
     if (q) { values.push(q); where.push(`(w.search_vector @@ websearch_to_tsquery('english', $${values.length}) OR w.normalized_title % lower($${values.length}))`); }
     values.push(Math.min(limit, 500));
-    const result = await query<WorkRow>(`${workSelect} ${join} WHERE ${where.join(' AND ')} GROUP BY w.id, v.id ORDER BY w.updated_at DESC LIMIT $${values.length}`, values);
+    values.push(Math.max(0,offset));
+    const result = await query<WorkRow>(`${workSelect} ${join} WHERE ${where.join(' AND ')} GROUP BY w.id, v.id ORDER BY w.updated_at DESC,w.id LIMIT $${values.length-1} OFFSET $${values.length}`, values);
     return result.rows.map(rowToWork);
   }
 
@@ -65,9 +66,18 @@ export class Repository {
 
   async createWork(input: WorkInput) {
     const doi = cleanDoi(input.doi);
+    if (input.connector && input.externalId) {
+      const match = await query<{id:string}>('SELECT s.work_id AS id FROM source_record s JOIN work w ON w.id=s.work_id WHERE s.connector=$1 AND s.external_id=$2 AND w.deleted_at IS NULL LIMIT 1', [input.connector,input.externalId]);
+      if (match.rows[0]) return (await this.getWork(match.rows[0].id))!;
+    }
     if (doi) {
       const existing = await query<{ id: string }>('SELECT id FROM work WHERE lower(doi) = $1 AND deleted_at IS NULL', [doi]);
       if (existing.rows[0]) return (await this.getWork(existing.rows[0].id))!;
+    }
+    // Identifier-less connector results must not accumulate on every daily run.
+    if (input.connector && !doi) {
+      const match = await query<{id:string}>('SELECT id FROM work WHERE normalized_title=$1 AND year IS NOT DISTINCT FROM $2 AND deleted_at IS NULL LIMIT 1', [normalizeTitle(input.title),input.year ?? null]);
+      if (match.rows[0]) return (await this.getWork(match.rows[0].id))!;
     }
     const family = input.authors?.[0]?.family ?? 'anon';
     const year = input.year ?? new Date().getUTCFullYear();
@@ -110,10 +120,13 @@ export class Repository {
   }
 
   async listCollections(): Promise<Collection[]> {
-    const result = await query<any>(`SELECT c.*, count(cm.work_id)::int AS member_count FROM collection c
+    const result = await query<any>(`SELECT c.*, count(cm.work_id)::int AS member_count,
+      count(cm.work_id) FILTER (WHERE cm.seen_at IS NULL)::int AS new_count FROM collection c
       LEFT JOIN collection_membership cm ON cm.collection_id=c.id WHERE c.deleted_at IS NULL GROUP BY c.id ORDER BY c.created_at`);
     return result.rows.map((row) => ({ id: row.id, name: row.name, description: row.description, parentId: row.parent_id,
-      memberCount: row.member_count, createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() }));
+      memberCount: row.member_count, newCount: row.new_count, discovery: row.discovery,
+      nextDiscoveryAt: row.next_discovery_at?.toISOString() ?? null, lastDiscoveryAt: row.last_discovery_at?.toISOString() ?? null,
+      discoveryError: row.discovery_error, createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() }));
   }
 
   async createCollection(input: { name: string; description?: string; parentId?: string | null }) {

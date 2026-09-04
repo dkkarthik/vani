@@ -36,9 +36,30 @@ export const Work = z.object({
 });
 export type Work = z.infer<typeof Work>;
 
+export const DiscoverySeed = z.object({
+  mode: z.enum(['topic', 'papers']), topic: z.string().trim().max(500).default(''),
+  workIds: z.array(z.string().uuid()).max(10).default([]),
+  timezone: z.string().default('America/New_York').refine(value => {
+    try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; }
+  }, 'Use an IANA timezone'),
+  hour: z.number().int().min(0).max(23).default(7), enabled: z.boolean().default(true)
+}).refine(value => value.mode === 'topic' ? value.topic.length >= 2 : value.workIds.length > 0,
+  'Provide a topic or at least one seed paper');
+export type DiscoverySeed = z.infer<typeof DiscoverySeed>;
+export interface FirstPass {
+  status: 'full_text' | 'partial_full_text' | 'abstract_only' | 'needs_evidence' | 'needs_model';
+  category: string; context: string; correctness: string; contributions: string; clarity: string;
+  novelty: string; comparedWorkIds: string[];
+  evidence: Array<{ workId: string; section: string; quote: string }>;
+  coverage: string[]; limitations: string[]; provider: string; createdAt: string;
+}
+export type CollectionWork = Work & { isNew: boolean; status: WorkStatus; firstPass?: FirstPass };
+
 export const Collection = z.object({
   id: z.string(), name: z.string(), description: z.string().default(''),
   parentId: z.string().nullable(), memberCount: z.number().int().default(0),
+  newCount: z.number().int().optional(), discovery: DiscoverySeed.nullable().optional(),
+  nextDiscoveryAt: z.string().nullable().optional(), lastDiscoveryAt: z.string().nullable().optional(), discoveryError: z.string().nullable().optional(),
   createdAt: z.string(), updatedAt: z.string()
 });
 export type Collection = z.infer<typeof Collection>;

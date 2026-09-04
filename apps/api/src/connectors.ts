@@ -9,10 +9,11 @@ const reconstructAbstract = (index?: Record<string, number[]>) => {
     .sort((a, b) => a.position - b.position).map((item) => item.word).join(' ');
 };
 
-export async function searchOpenAlex(term: string, email = '', limit = 12): Promise<Candidate[]> {
+export async function searchOpenAlex(term: string, email = '', limit = 12, since?: string): Promise<Candidate[]> {
   const url = new URL('https://api.openalex.org/works');
   url.searchParams.set('search', term); url.searchParams.set('per-page', String(limit));
   if (email) url.searchParams.set('mailto', email);
+  if (since) { url.searchParams.set('filter', `from_publication_date:${since}`); url.searchParams.set('sort', 'publication_date:desc'); }
   const response = await fetch(url, { headers: { 'User-Agent': `VANI/0.1${email ? ` (mailto:${email})` : ''}` }, signal: AbortSignal.timeout(12_000) });
   if (!response.ok) throw new Error(`OpenAlex returned ${response.status}`);
   const data: any = await response.json();
@@ -25,9 +26,10 @@ export async function searchOpenAlex(term: string, email = '', limit = 12): Prom
     connector: 'openalex', externalId: item.id, sourcePayload: item }));
 }
 
-export async function searchCrossref(term: string, limit = 8): Promise<Candidate[]> {
+export async function searchCrossref(term: string, limit = 8, since?: string): Promise<Candidate[]> {
   const url = new URL('https://api.crossref.org/works'); url.searchParams.set('query.bibliographic', term); url.searchParams.set('rows', String(limit));
   url.searchParams.set('select', 'DOI,title,author,published,container-title,abstract,type,URL');
+  if (since) { url.searchParams.set('filter', `from-pub-date:${since}`); url.searchParams.set('sort', 'published'); url.searchParams.set('order', 'desc'); }
   const response = await fetch(url, { headers: { 'User-Agent': 'VANI/0.1 (research discovery)' }, signal: AbortSignal.timeout(12_000) });
   if (!response.ok) throw new Error(`Crossref returned ${response.status}`);
   const data: any = await response.json();
@@ -48,4 +50,13 @@ export async function discover(term: string, sources: string[], email = '') {
   const candidates = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
   const seen = new Set<string>();
   return candidates.filter((candidate) => { const key = candidate.doi ?? candidate.title.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; });
+}
+
+export async function discoverCollection(term: string, email: string, since?: string) {
+  const results = await Promise.allSettled([searchOpenAlex(term,email,100,since),searchCrossref(term,100,since)]);
+  const warnings = results.flatMap((result,index) => result.status === 'rejected' ? [`${['OpenAlex','Crossref'][index]}: ${String(result.reason)}`] : []);
+  if (warnings.length === results.length) throw new Error(warnings.join('; '));
+  const items = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+  if (items.length >= 100) warnings.push('Source result limit reached; discovery is not exhaustive. Narrow the topic if needed.');
+  return { items, warnings };
 }
