@@ -42,6 +42,8 @@ See [Developer guide](docs/13-developer-guide.md) for architecture, configuratio
 
 See [Living collections](docs/14-living-collections.md) for topic/paper seeding, daily discovery, NEW markers, and Keshav first-pass reports.
 
+See [Feature research](docs/15-feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:
