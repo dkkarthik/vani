@@ -42,7 +42,7 @@ See [Developer guide](docs/13-developer-guide.md) for architecture, configuratio
 
 See [Living collections](docs/14-living-collections.md) for topic/paper seeding, daily discovery, NEW markers, and Keshav first-pass reports.
 
-See [Feature research](docs/15-feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
+See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis
 

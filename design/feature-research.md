@@ -175,7 +175,7 @@ VANI should expose four distinct kinds of connection. Their similarity on screen
 | Evidence-bearing interpretation | An experiment evaluates a method, or a result challenges a particular claim. | Exact passage/table, conditions, uncertainty, and reviewer/user corrections. |
 | Personal research organization  | Read A before B; compare these two passages; use this evidence in chapter 2. | The user's purpose, author, and editable rationale.                          |
 
-This distinction combines [Connected Papers' methodology][p8], [Scite's citation context][p22], and the user need for [precise passage relationships][u4]. It also fits VANI's existing distinction among direct text, structured data, computed relationships, model inference, and user assertions in [the ontology](06-relationship-ontology.md).
+This distinction combines [Connected Papers' methodology][p8], [Scite's citation context][p22], and the user need for [precise passage relationships][u4]. It also fits VANI's existing distinction among direct text, structured data, computed relationships, model inference, and user assertions in [the ontology](../docs/06-relationship-ontology.md).
 
 **Design recommendation:** a selected edge should answer “What relationship is claimed?”, “Why is it shown?”, and “Where can I inspect the source?” A small neighborhood plus an evidence table should be the default starting point. Users can open a larger landscape deliberately.
 
@@ -202,7 +202,7 @@ For discovery, measure accepted useful recommendations and papers that informed 
 
 ## Implications for the existing VANI plan
 
-The [product requirements](01-product-requirements.md), [ontology](06-relationship-ontology.md), [developer guide](13-developer-guide.md), and [living collections documentation](14-living-collections.md) already address many desired capabilities. The table below compares the research with **documented scope**, not a fresh implementation audit. In particular, the living-collections document is more recent than parts of the developer guide.
+The [product requirements](../docs/01-product-requirements.md), [ontology](../docs/06-relationship-ontology.md), [developer guide](../docs/13-developer-guide.md), and [living collections documentation](../docs/14-living-collections.md) already address many desired capabilities. The table below compares the research with **documented scope**, not a fresh implementation audit. In particular, the living-collections document is more recent than parts of the developer guide.
 
 | Area                           | Existing documented direction                                                                                       | Research-driven refinement                                                                                                                                    |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
