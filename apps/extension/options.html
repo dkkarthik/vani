@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Connect VANI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="options">
+    <header>
+      <span class="mark">V</span>
+      <div>
+        <strong>Connect your workspace</strong
+        ><small>VANI browser capture</small>
+      </div>
+    </header>
+    <main>
+      <p>
+        Start VANI on this computer. In
+        <a id="open-settings" target="_blank" rel="noopener">VANI → Settings</a
+        >, choose <strong>Get capture key</strong>, then paste the key below.
+      </p>
+      <form id="connection">
+        <label
+          >Capture key<input
+            id="token"
+            type="password"
+            required
+            autocomplete="off"
+            spellcheck="false"
+            minlength="64"
+            maxlength="64"
+        /></label>
+        <details>
+          <summary>Local service addresses</summary>
+          <label>API address<input id="base-url" type="url" required /></label
+          ><label
+            >VANI app address<input id="app-url" type="url" required
+          /></label>
+          <p class="hint">
+            This version connects to HTTP on localhost or 127.0.0.1 only.
+          </p>
+        </details>
+        <button class="primary" type="submit">Connect and test</button>
+      </form>
+      <p id="status" class="notice" role="status" hidden></p>
+      <section class="privacy">
+        <h2>Access you control</h2>
+        <p>
+          VANI reads an article when you click the extension. A PDF download may
+          ask for access to that website; you can save the metadata without
+          granting it.
+        </p>
+        <p>
+          Your key and most recent capture are stored in this Chrome profile.
+          Article metadata and selected PDFs go to your local VANI service. The
+          extension has no analytics.
+        </p>
+        <div class="row">
+          <button id="forget-sites" class="quiet" type="button">
+            Forget PDF site access</button
+          ><button id="disconnect" class="quiet" type="button">
+            Disconnect extension
+          </button>
+        </div>
+        <small
+          >Disconnect clears this extension’s key and last capture. Revoke the
+          key in VANI Settings to invalidate it everywhere.</small
+        >
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

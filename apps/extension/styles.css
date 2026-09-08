@@ -1,0 +1,300 @@
+:root {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #243d35;
+  background: #f6f5f0;
+  font-size: 13px;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.popup {
+  width: 410px;
+}
+.options {
+  max-width: 620px;
+  margin: 36px auto;
+  border: 1px solid #d8dfd5;
+  border-radius: 16px;
+  background: #fff;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #dce1d7;
+  background: #fff;
+}
+header strong {
+  font-size: 18px;
+}
+header small {
+  display: block;
+  margin-top: 3px;
+}
+header button {
+  margin-left: auto;
+}
+.mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: #285b49;
+  color: white;
+  border-radius: 12px;
+  font:
+    700 26px Georgia,
+    serif;
+}
+main {
+  padding: 18px 20px;
+}
+p {
+  line-height: 1.6;
+}
+small,
+.hint,
+footer {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #62736a;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+label small {
+  font-weight: 400;
+}
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  background: white;
+  border: 1px solid #ccd5cb;
+  border-radius: 7px;
+  width: 100%;
+  padding: 9px;
+  min-width: 0;
+}
+textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+#title {
+  font-weight: 600;
+  font-size: 15px;
+}
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #408363;
+  outline-offset: 2px;
+}
+button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #bdcdc0;
+  background: white;
+  color: #285b49;
+  padding: 10px 12px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+button:hover {
+  background: #edf3eb;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.primary {
+  background: #285b49;
+  border-color: #285b49;
+  color: #fff;
+}
+.primary:hover {
+  background: #204a3b;
+}
+.full {
+  width: 100%;
+}
+.quiet {
+  background: transparent;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.row > label {
+  flex: 1;
+  min-width: 0;
+}
+.row > button {
+  flex-shrink: 0;
+}
+.source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -3px 0 17px;
+  font-size: 11px;
+  color: #68796d;
+}
+#source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill {
+  border: 1px solid #d6dfd4;
+  border-radius: 12px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+details {
+  border-top: 1px solid #dce1d7;
+  margin-top: 6px;
+  padding: 12px 0;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+details:not([open]) summary {
+  margin-bottom: 0;
+}
+.pdf-card {
+  margin: 8px 0 14px;
+  padding: 12px;
+  background: #ebf0e7;
+  border: 1px solid #d8e1d1;
+  border-radius: 9px;
+}
+.checkbox {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+}
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #285b49;
+  margin: 2px 0;
+}
+.checkbox small {
+  display: block;
+  margin-top: 3px;
+}
+#pdf-url {
+  margin-top: 10px;
+  font-size: 11px;
+}
+.notice,
+.job {
+  padding: 12px;
+  border: 1px solid #d7c79e;
+  background: #fff8e7;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.job {
+  margin: 16px 0 0;
+  background: #eaf2e7;
+  border-color: #c9dac3;
+}
+.job p {
+  margin: 6px 0 10px;
+}
+.job a,
+a {
+  color: #285b49;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.job[data-state="partial"],
+.job[data-state="error"] {
+  background: #fff8e7;
+  border-color: #d7c79e;
+}
+.job-title {
+  font-size: 12px;
+}
+footer {
+  margin-top: 16px;
+  text-align: center;
+}
+.privacy {
+  border-top: 1px solid #dce1d7;
+  margin-top: 24px;
+  padding-top: 12px;
+}
+.privacy h2 {
+  font-size: 15px;
+}
+.privacy .row {
+  margin: 14px 0;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Use compact spacing for Chrome's constrained popup height. */
+.popup header {
+  padding: 12px 20px;
+}
+.popup main {
+  padding: 12px 20px;
+}
+.popup details {
+  padding: 8px 0;
+  margin-top: 2px;
+}
+.popup label {
+  margin-bottom: 9px;
+}
+.popup .source {
+  margin-bottom: 10px;
+}
+.popup .pdf-card {
+  padding: 10px;
+  margin: 6px 0 10px;
+}
+.popup .checkbox {
+  margin: 0;
+}
+.popup .job {
+  padding: 10px;
+  margin-top: 10px;
+}
+.popup .job p {
+  margin: 4px 0 8px;
+}
+.popup footer {
+  margin-top: 10px;
+}

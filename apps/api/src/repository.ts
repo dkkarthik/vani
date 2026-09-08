@@ -1,4 +1,5 @@
 import { v7 as uuidv7 } from 'uuid';
+import type { PoolClient } from 'pg';
 import type { Collection, GraphProjection, Relationship, Work, WorkStatus } from '@vani/shared';
 import { pool, query, transaction } from './db.js';
 import { cleanDoi, makeCitationKey, normalizeTitle, toBibtex, venueAbbreviation } from './lib/citations.js';
@@ -41,7 +42,7 @@ export interface WorkInput {
   verificationStatus?: Work['verificationStatus']; manifestationType?: string; accessClass?: string;
   publisher?: string; publicationPlace?: string; publicationDate?: string; volume?: string; issue?: string; pages?: string;
   affiliations?: Array<{ name: string; place?: string }>; salientContribution?: string; recordKind?: 'scholarly_record' | 'demo_fixture';
-  connector?: string; externalId?: string; sourcePayload?: unknown;
+  connector?: string; externalId?: string; sourcePayload?: unknown; deduplicateByTitle?: boolean;
 }
 
 export class Repository {
@@ -59,30 +60,32 @@ export class Repository {
     return result.rows.map(rowToWork);
   }
 
-  async getWork(id: string) {
-    const result = await query<WorkRow>(`${workSelect} WHERE w.id = $1 AND w.deleted_at IS NULL GROUP BY w.id, v.id`, [id]);
+  async getWork(id: string, client?: PoolClient) {
+    const result = await (client ?? pool).query<WorkRow>(`${workSelect} WHERE w.id = $1 AND w.deleted_at IS NULL GROUP BY w.id, v.id`, [id]);
     return result.rows[0] ? rowToWork(result.rows[0]) : null;
   }
 
-  async createWork(input: WorkInput) {
+  async createWork(input: WorkInput, client?: PoolClient) {
+    const connection = client ?? pool;
     const doi = cleanDoi(input.doi);
     if (input.connector && input.externalId) {
-      const match = await query<{id:string}>('SELECT s.work_id AS id FROM source_record s JOIN work w ON w.id=s.work_id WHERE s.connector=$1 AND s.external_id=$2 AND w.deleted_at IS NULL LIMIT 1', [input.connector,input.externalId]);
-      if (match.rows[0]) return (await this.getWork(match.rows[0].id))!;
+      const match = await connection.query<{id:string}>('SELECT s.work_id AS id FROM source_record s JOIN work w ON w.id=s.work_id WHERE s.connector=$1 AND s.external_id=$2 AND w.deleted_at IS NULL LIMIT 1', [input.connector,input.externalId]);
+      if (match.rows[0]) return (await this.getWork(match.rows[0].id, client))!;
     }
     if (doi) {
-      const existing = await query<{ id: string }>('SELECT id FROM work WHERE lower(doi) = $1 AND deleted_at IS NULL', [doi]);
-      if (existing.rows[0]) return (await this.getWork(existing.rows[0].id))!;
+      const existing = await connection.query<{ id: string }>('SELECT id FROM work WHERE lower(doi) = $1 AND deleted_at IS NULL', [doi]);
+      if (existing.rows[0]) return (await this.getWork(existing.rows[0].id, client))!;
     }
     // Identifier-less connector results must not accumulate on every daily run.
-    if (input.connector && !doi) {
-      const match = await query<{id:string}>('SELECT id FROM work WHERE normalized_title=$1 AND year IS NOT DISTINCT FROM $2 AND deleted_at IS NULL LIMIT 1', [normalizeTitle(input.title),input.year ?? null]);
-      if (match.rows[0]) return (await this.getWork(match.rows[0].id))!;
+    if (input.connector && !doi && input.deduplicateByTitle !== false) {
+      const match = await connection.query<{id:string}>('SELECT id FROM work WHERE normalized_title=$1 AND year IS NOT DISTINCT FROM $2 AND deleted_at IS NULL LIMIT 1', [normalizeTitle(input.title),input.year ?? null]);
+      if (match.rows[0]) return (await this.getWork(match.rows[0].id, client))!;
     }
     const family = input.authors?.[0]?.family ?? 'anon';
     const year = input.year ?? new Date().getUTCFullYear();
     const venue = input.venue?.trim() || 'Unknown venue';
-    return transaction(async (client) => {
+    const run = client ? <T>(fn: (client: PoolClient) => Promise<T>) => fn(client) : transaction;
+    return run(async (client) => {
       let venueRow = await client.query<{ id: string; abbreviation: string }>('SELECT id, abbreviation FROM venue WHERE lower(canonical_name) = lower($1) LIMIT 1', [venue]);
       if (!venueRow.rows[0]) {
         const id = uuidv7();
@@ -116,7 +119,7 @@ export class Repository {
           VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [uuidv7(), id, input.connector, input.externalId, JSON.stringify(payload), payloadHash]);
       }
       return id;
-    }).then((id) => this.getWork(id) as Promise<Work>);
+    }).then((id) => this.getWork(id, client) as Promise<Work>);
   }
 
   async listCollections(): Promise<Collection[]> {

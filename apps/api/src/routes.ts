@@ -9,6 +9,7 @@ import { ObjectStore } from './object-store.js';
 import { Repository } from './repository.js';
 import { answerQuestion } from './ask.js';
 import { DiscoverySeed } from '@vani/shared';
+import { registerCaptureRoutes } from './capture.js';
 import { acknowledgeMembers, collectionMembers, configureCollection } from './collection-discovery.js';
 
 const Id = z.string().uuid();
@@ -20,6 +21,7 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
+  await registerCaptureRoutes(app, repository);
 
   app.get('/api/v1/health', async () => ({ status: 'ok', version: '0.1.0', databaseTime: (await repository.health()).toISOString() }));
   app.get('/api/v1/capabilities', async () => ({ version: '0.1.0', connectors: ['openalex','crossref'], graph: true, pdf: true,

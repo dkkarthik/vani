@@ -42,6 +42,8 @@ See [Developer guide](docs/13-developer-guide.md) for architecture, configuratio
 
 See [Living collections](docs/14-living-collections.md) for topic/paper seeding, daily discovery, NEW markers, and Keshav first-pass reports.
 
+See [Chrome browser capture (F01)](docs/15-browser-capture.md) to install the extension, pair it with VANI, and save papers and available PDFs into collections. Build the unpacked extension and store ZIP with `npm run extension:package`.
+
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis

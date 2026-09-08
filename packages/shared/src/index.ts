@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './capture.js';
 
 export const WorkStatus = z.enum(['inbox', 'to_read', 'skimming', 'reading', 'read', 'foundational', 'cited', 'rejected', 'archived']);
 export type WorkStatus = z.infer<typeof WorkStatus>;

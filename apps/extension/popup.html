@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Save to VANI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="popup">
+    <header>
+      <span class="mark">V</span>
+      <div>
+        <strong>VANI</strong><small>Keep the paper. Connect the ideas.</small>
+      </div>
+      <button id="settings" class="quiet" type="button">Settings</button>
+    </header>
+    <main>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <details>
+        <summary>Have a DOI instead?</summary>
+        <form id="identifier-form" class="row">
+          <label
+            >Look up DOI in Crossref<input
+              id="identifier"
+              placeholder="10.1234/example"
+              maxlength="300"
+              required /></label
+          ><button id="resolve" type="submit">Look up</button>
+        </form>
+      </details>
+      <form id="capture">
+        <label
+          >Title<textarea
+            id="title"
+            rows="2"
+            required
+            maxlength="2000"
+          ></textarea>
+        </label>
+        <div class="source">
+          <span id="source"></span><span id="method" class="pill"></span>
+        </div>
+        <div class="row">
+          <label
+            >Save to collection<select id="collection" required>
+              <option value="">Connecting to VANI…</option>
+            </select></label
+          ><button id="new-collection" type="button" class="quiet">
+            + New
+          </button>
+        </div>
+        <div id="collection-editor" class="row" hidden>
+          <label
+            >New collection name<input
+              id="collection-name"
+              maxlength="200" /></label
+          ><button id="create-collection" type="button">Create</button>
+        </div>
+        <details>
+          <summary>Review paper details</summary>
+          <label
+            >Authors
+            <small>One per line; use “Family, Given” to separate names.</small
+            ><textarea id="authors" rows="3"></textarea>
+          </label>
+          <div class="row">
+            <label
+              >Year<input
+                id="year"
+                type="number"
+                min="1000"
+                max="3000" /></label
+            ><label
+              >DOI<input id="doi" placeholder="10.1234/example" maxlength="300"
+            /></label>
+          </div>
+          <label
+            >Journal or conference<input id="venue" maxlength="1000" /></label
+          ><label
+            >Abstract<textarea
+              id="abstract"
+              rows="4"
+              maxlength="30000"
+            ></textarea>
+          </label>
+        </details>
+        <section class="pdf-card">
+          <label class="checkbox"
+            ><input id="save-pdf" type="checkbox" /><span
+              ><strong>Include PDF</strong
+              ><small id="pdf-help">Looking for a download link…</small></span
+            ></label
+          ><select id="pdf-url" aria-label="PDF download link" hidden></select>
+        </section>
+        <button id="save" class="primary full" type="submit" disabled>
+          Save paper
+        </button>
+      </form>
+      <section id="job" class="job" aria-live="polite" hidden>
+        <strong id="job-title"></strong>
+        <p id="job-message"></p>
+        <div class="row">
+          <button id="retry" type="button" hidden>Retry save</button
+          ><a id="open-work" target="_blank" rel="noopener" hidden
+            >Open in VANI ↗</a
+          >
+        </div>
+      </section>
+      <footer>
+        Saved to your local workspace · Review details before saving
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
