@@ -13,9 +13,13 @@
     "db:seed": "tsx src/cli/seed.ts"
   },
   "dependencies": {
+    "@citation-js/core": "^0.8.2",
+    "@citation-js/plugin-bibtex": "^0.8.2",
+    "@citation-js/plugin-ris": "^0.8.2",
     "@fastify/cors": "^11.1.0",
     "@fastify/multipart": "^9.2.1",
     "@vani/shared": "*",
+    "fast-xml-parser": "^5.11.1",
     "fastify": "^5.6.0",
     "fastify-plugin": "^5.0.1",
     "pg": "^8.16.3",

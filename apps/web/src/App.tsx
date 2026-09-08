@@ -1,3 +1,5 @@
+import { ImportsPage } from './pages/ImportsPage';
+import { MetadataPage } from './pages/MetadataPage';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { BookOpen, Boxes, Compass, FileText, Library, Map, MessageCircle, Search, Settings, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -42,6 +44,8 @@ export function App(){
         <Route path="/read" element={<ReaderPage/>}/>
         <Route path="/read/:workId" element={<ReaderPage/>}/>
         <Route path="/ask" element={<AskPage/>}/>
+        <Route path="/imports" element={<ImportsPage/>}/>
+        <Route path="/works/:workId/metadata" element={<MetadataPage/>}/>
         <Route path="/library" element={<LibraryPage/>}/>
         <Route path="/settings" element={<SettingsPage/>}/>
       </Routes></div>

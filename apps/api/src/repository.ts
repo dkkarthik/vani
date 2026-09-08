@@ -2,7 +2,7 @@ import { v7 as uuidv7 } from 'uuid';
 import type { PoolClient } from 'pg';
 import type { Collection, GraphProjection, Relationship, Work, WorkStatus } from '@vani/shared';
 import { pool, query, transaction } from './db.js';
-import { cleanDoi, makeCitationKey, normalizeTitle, toBibtex, venueAbbreviation } from './lib/citations.js';
+import { citationSuffix, cleanDoi, makeCitationKey, normalizeTitle, toBibtex, venueAbbreviation } from './lib/citations.js';
 
 type WorkRow = {
   id: string; title: string; abstract: string; year: number | null; venue: string | null;
@@ -10,13 +10,13 @@ type WorkRow = {
   manifestation_type: string; verification_status: Work['verificationStatus']; access_class: string;
   authors: Array<{ id: string; given: string; family: string; orcid?: string | null }> | null;
   source_metadata: Record<string, any>;
-  created_at: Date; updated_at: Date;
+  created_at: Date; updated_at: Date; version: number;
 };
 
 const workSelect = `
   SELECT w.id, w.title, w.abstract, w.year, w.doi, w.citation_key, w.manifestation_type,
     w.verification_status, w.access_class, w.created_at, w.updated_at,
-    w.source_metadata,
+    w.source_metadata, w.version,
     v.canonical_name AS venue, v.abbreviation AS venue_abbreviation,
     COALESCE(jsonb_agg(jsonb_build_object('id', p.id, 'given', p.given_names, 'family', p.family_name, 'orcid', p.orcid)
       ORDER BY a.position) FILTER (WHERE p.id IS NOT NULL), '[]') AS authors
@@ -24,6 +24,11 @@ const workSelect = `
   LEFT JOIN authorship a ON a.work_id = w.id LEFT JOIN person p ON p.id = a.person_id`;
 
 const rowToWork = (row: WorkRow): Work => ({
+  version: row.version,
+  publicationType: row.source_metadata?.publicationType ?? 'article-journal', editors: row.source_metadata?.editors ?? [],
+  edition: row.source_metadata?.edition ?? '', isbn: row.source_metadata?.isbn ?? '', issn: row.source_metadata?.issn ?? '',
+  url: row.source_metadata?.url ?? '', language: row.source_metadata?.language ?? '', articleNumber: row.source_metadata?.articleNumber ?? '',
+  onlineDate: row.source_metadata?.onlineDate ?? '', printDate: row.source_metadata?.printDate ?? '',
   id: row.id, title: row.title, abstract: row.abstract, year: row.year,
   venue: row.venue ?? '', venueAbbreviation: row.venue_abbreviation ?? 'misc', doi: row.doi,
   citationKey: row.citation_key, authors: row.authors ?? [], verificationStatus: row.verification_status,
@@ -37,6 +42,7 @@ const rowToWork = (row: WorkRow): Work => ({
 });
 
 export interface WorkInput {
+  publicationType?: string; editors?: Array<{given:string;family:string}>; edition?:string; isbn?:string; issn?:string; url?:string; language?:string; articleNumber?:string; onlineDate?:string; printDate?:string;
   title: string; abstract?: string; year?: number | null; venue?: string; doi?: string | null;
   authors?: Array<{ given?: string; family: string; orcid?: string | null }>;
   verificationStatus?: Work['verificationStatus']; manifestationType?: string; accessClass?: string;
@@ -93,7 +99,7 @@ export class Repository {
       }
       let key = makeCitationKey(family, venue, year);
       for (let suffix = 0; ; suffix++) {
-        const candidate = suffix ? makeCitationKey(family, venue, year, String.fromCharCode(96 + suffix)) : key;
+        const candidate = suffix ? makeCitationKey(family, venue, year, citationSuffix(suffix)) : key;
         const collision = await client.query('SELECT 1 FROM work WHERE citation_key = $1', [candidate]);
         if (!collision.rowCount) { key = candidate; break; }
       }
@@ -101,6 +107,7 @@ export class Repository {
       await client.query(`INSERT INTO work(id,title,normalized_title,abstract,year,venue_id,doi,citation_key,manifestation_type,verification_status,access_class,source_metadata)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [id, input.title.trim(), normalizeTitle(input.title), input.abstract ?? '', input.year ?? null,
         venueRow.rows[0]!.id, doi, key, input.manifestationType ?? 'version_of_record', input.verificationStatus ?? 'unverified', input.accessClass ?? 'metadata_only', JSON.stringify({
+          publicationType: input.publicationType ?? 'article-journal', editors: input.editors ?? [], edition: input.edition ?? '', isbn: input.isbn ?? '', issn: input.issn ?? '', url: input.url ?? '', language: input.language ?? '', articleNumber: input.articleNumber ?? '', onlineDate: input.onlineDate ?? '', printDate: input.printDate ?? '',
           publisher: input.publisher ?? '', publicationPlace: input.publicationPlace ?? '', publicationDate: input.publicationDate ?? '',
           volume: input.volume ?? '', issue: input.issue ?? '', pages: input.pages ?? '', affiliations: input.affiliations ?? [],
           salientContribution: input.salientContribution ?? '', recordKind: input.recordKind ?? 'scholarly_record'

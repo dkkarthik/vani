@@ -2,7 +2,7 @@ import type { Answer, Collection, CollectionWork, DiscoverySeed, GraphProjection
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/v1${path}`, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init?.headers } });
   if (!response.ok) { const body = await response.json().catch(() => null); throw new ApiError(body?.error?.message ?? response.statusText, response.status); }
   if (response.status === 204) return undefined as T;

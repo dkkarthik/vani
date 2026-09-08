@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanDoi, makeCitationKey, toBibtex, venueAbbreviation } from './citations.js';
+import { citationSuffix, cleanDoi, makeCitationKey, toBibtex, venueAbbreviation } from './citations.js';
 
 describe('citation identity', () => {
   it('generates the frozen CLEAR key', () => {
@@ -15,3 +15,5 @@ describe('citation identity', () => {
     expect(value).toContain('@article{meshram-ral26,'); expect(value).toContain('author = {Meshram, Pranay}'); expect(value).toContain('doi = {10.1109/LRA.2026.3726338}\n}');
   });
 });
+
+it('allocates valid citation suffixes beyond a large batch collision',()=>{expect([0,1,26,27,52,53,500].map(citationSuffix)).toEqual(['','a','z','aa','az','ba','sf']);});

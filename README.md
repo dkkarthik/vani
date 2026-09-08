@@ -44,6 +44,8 @@ See [Living collections](docs/14-living-collections.md) for topic/paper seeding,
 
 See [Chrome browser capture (F01)](docs/15-browser-capture.md) to install the extension, pair it with VANI, and save papers and available PDFs into collections. Build the unpacked extension and store ZIP with `npm run extension:package`.
 
+See [Import research and review metadata (F02/F03)](docs/16-import-and-metadata.md) for bulk migration, source comparison, protected corrections, upgrade steps, and verification commands.
+
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis

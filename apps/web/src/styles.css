@@ -52,3 +52,34 @@
 .first-pass-link{display:block;background:none;border:0;color:#26735f;padding:7px 0;text-align:left;cursor:pointer;font-size:12px}.novelty-preview{font-size:12px;color:#536660;line-height:1.5;margin:2px 0 4px}.seed-paper-list{max-height:230px;overflow:auto;border:1px solid #d5dfdb;border-radius:8px;padding:10px}.seed-paper-list label{display:flex;gap:10px;align-items:start;padding:8px;font-size:13px}.seed-paper-list input,.stack-form input[type=checkbox]{width:auto;flex-shrink:0}.first-pass-report{line-height:1.65}.first-pass-report dt{font-weight:700}.first-pass-report dd{margin:0 0 14px}.first-pass-report blockquote{margin:12px 0;padding:10px 14px;border-left:3px solid #8ab7a6;background:#f5f8f6}.first-pass-report blockquote a{display:block;font-size:12px}.collection-name{display:grid;gap:8px;margin-bottom:18px}.collection-name input{padding:10px;border:1px solid #bdcdc6;border-radius:6px}
 
 .capture-settings>p{line-height:1.6;color:var(--muted)}.capture-actions{display:flex;gap:10px;margin:16px 0}.capture-key{display:grid;gap:8px;font-size:12px}.capture-key input{width:100%;padding:10px;border:1px solid #d7ddd2;border-radius:6px}.capture-feedback:empty{display:none}.capture-sources{padding:16px 0;border-top:1px solid #e0e4da;margin-top:18px}.capture-sources h3{font-size:13px;margin:0 0 12px}.capture-sources article{padding:8px 0;overflow-wrap:anywhere}.capture-sources a{color:#285b49;font-size:13px}.capture-sources small{display:block;font-size:11px;color:#6d796f;line-height:1.5;margin-top:4px}.capture-sources p{font-size:11px;line-height:1.5}
+
+/* Import and metadata review */
+.review-panel { background: var(--surface, #fff); border: 1px solid var(--border, #dce3e0); border-radius: 14px; padding: 24px; margin: 20px 0; min-width: 0; }
+.review-panel h2 { font-size: 19px; margin: 0 0 16px; }
+.review-panel p { line-height: 1.6; }
+.review-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; padding: 16px; background: #f5f7f6; font-size: 12px; }
+.review-panel details { margin-top: 18px; }
+.review-panel summary { cursor: pointer; }
+.review-panel code { overflow-wrap: anywhere; font-size: 12px; }
+.metadata-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: 20px; }
+.metadata-form fieldset, .wide-field { grid-column: 1 / -1; }
+.metadata-form fieldset { border: 1px solid #dce3e0; padding: 16px; border-radius: 8px; min-width: 0; }
+.name-row { display: flex; gap: 8px; align-items: end; margin-bottom: 12px; flex-wrap: wrap; }
+.name-row label { flex: 1; min-width: 120px; }
+.check-line { display: flex !important; align-items: center; gap: 10px; margin: 14px 0; }
+.check-line input, .review-table input { width: auto !important; flex: none; }
+.review-table-wrap { overflow-x: auto; margin: 18px 0; }
+.review-table { border-collapse: collapse; width: 100%; text-align: left; font-size: 13px; }
+.review-table th, .review-table td { border-bottom: 1px solid #dce3e0; padding: 12px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 100px; max-width: 340px; }
+.review-table td:first-child, .review-table th:first-child { min-width: 45px; }
+.field-difference { background: #fff9e9; }
+.review-warnings { color: #775c26; line-height: 1.6; padding-left: 22px; }
+.import-record-heading { display: flex; gap: 18px; justify-content: space-between; align-items: start; }
+.import-record-heading span { white-space: nowrap; color: #54746a; }
+.decision-row { display: flex; flex-direction: column; gap: 7px; padding: 14px 0; border-bottom: 1px solid #e5e9e7; overflow-wrap: anywhere; }
+.decision-row small, .muted { color: #65756f; }
+@media(max-width:800px) { .metadata-form { grid-template-columns: 1fr; } .review-panel { padding: 16px; } .import-record-heading { flex-direction: column; gap: 0; } }
+.import-page .check-line, .metadata-page .check-line { font-size: 13px; text-transform: none; }
+.import-record-heading .check-line { font-size: 16px; color: var(--ink); margin-top: 0; }
+.review-panel a:not(.button) { color: #236b59; text-decoration: underline; text-underline-offset: 3px; }
+.review-panel .toolbar { gap: 12px; flex-wrap: wrap; }

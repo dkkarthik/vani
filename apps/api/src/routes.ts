@@ -1,3 +1,5 @@
+import { registerImportRoutes } from './imports/service.js';
+import { registerMetadataRoutes } from './metadata-routes.js';
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { v7 as uuidv7 } from 'uuid';
@@ -22,6 +24,8 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
   await registerCaptureRoutes(app, repository);
+  await registerImportRoutes(app,repository);
+  await registerMetadataRoutes(app,repository);
 
   app.get('/api/v1/health', async () => ({ status: 'ok', version: '0.1.0', databaseTime: (await repository.health()).toISOString() }));
   app.get('/api/v1/capabilities', async () => ({ version: '0.1.0', connectors: ['openalex','crossref'], graph: true, pdf: true,

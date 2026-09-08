@@ -1,3 +1,5 @@
+export * from './metadata.js';
+export * from './imports.js';
 import { z } from 'zod';
 export * from './capture.js';
 
@@ -32,6 +34,12 @@ export const Work = z.object({
   verificationStatus: VerificationStatus,
   manifestationType: z.string().default('version_of_record'),
   accessClass: z.string().default('metadata_only'),
+  version: z.number().int().default(1),
+  publicationType: z.string().default('article-journal'),
+  editors: z.array(Author).default([]),
+  edition: z.string().default(''), isbn: z.string().default(''), issn: z.string().default(''),
+  url: z.string().default(''), language: z.string().default(''), articleNumber: z.string().default(''),
+  onlineDate: z.string().default(''), printDate: z.string().default(''),
   createdAt: z.string(),
   updatedAt: z.string()
 });

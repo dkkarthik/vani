@@ -45,3 +45,10 @@ export const toBibtex = (work: BibWork) => {
   fields[last] = fields[last]!.replace(/,$/, '');
   return `@article{${work.citationKey},\n${fields.join('\n')}\n}`;
 };
+
+// Spreadsheet-style suffixes keep large imports valid beyond 26 collisions.
+export const citationSuffix = (ordinal:number) => {
+  let suffix='';
+  for(let value=ordinal;value>0;value=Math.floor((value-1)/26))suffix=String.fromCharCode(97+(value-1)%26)+suffix;
+  return suffix;
+};
