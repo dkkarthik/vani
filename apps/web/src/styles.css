@@ -144,3 +144,13 @@
 .comparison-matrix th:first-child { min-width:240px; width:240px; }
 .comparison-matrix { min-width:1320px; }
 .knowledge-page .k-row>.button { margin-left:12px; }
+
+.board-scroll { overflow:auto; max-height:620px; border:1px solid var(--line); border-radius:10px; background:#eef3ed; }
+.board-surface { position:relative; }
+.board-lines { position:absolute; inset:0; pointer-events:none; }
+.board-card { position:absolute; width:265px; min-height:125px; padding:12px; background:#fffef7; border:1px solid #99b4a7; border-radius:10px; box-shadow:0 3px 9px #25483416; }
+.board-card.active { outline:3px solid #ca9c36; }
+.board-card .cell-button { font-weight:650; display:block; }
+.card-drag { touch-action:none; border:0; background:#e5eee7; color:#426455; border-radius:4px; font-size:11px; padding:5px 8px; cursor:grab; }
+.board-list li { padding:12px; border-bottom:1px solid var(--line); }
+.candidate-feedback { border-top:1px solid var(--line); margin-top:18px; padding-top:12px; }

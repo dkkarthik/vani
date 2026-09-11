@@ -12,8 +12,14 @@ export function sharedReferences(a: string[], b: string[]) {
     shared = [...aa].filter((x) => bb.has(x));
   return { shared, score: shared.length / (new Set([...aa, ...bb]).size || 1) };
 }
-export async function layers(collectionId?: string) {
+export async function layers(collectionId?: string, workIds?: string[]) {
   const scope = await libraryWhere(LibraryRule.parse({}), collectionId);
+  if (workIds?.length) {
+    scope.values.push(workIds);
+    scope.where.push(
+      `w.id IN (SELECT canonical_work(id) FROM unnest($${scope.values.length}::uuid[]) q(id))`,
+    );
+  }
   const works = (
     await pool.query(
       `SELECT w.id,w.title,w.citation_key,concat_ws(' ',w.title,w.abstract,w.doi,w.year,w.citation_key,(SELECT string_agg(alias.citation_key,' ') FROM work alias WHERE canonical_work(alias.id)=w.id),v.canonical_name,w.source_metadata::text,(SELECT string_agg(p.display_name,' ') FROM authorship a JOIN person p ON p.id=a.person_id WHERE a.work_id=w.id)) AS text FROM work w LEFT JOIN venue v ON v.id=w.venue_id WHERE ${scope.where.join(" AND ")} ORDER BY w.id LIMIT 101`,
@@ -156,7 +162,7 @@ export async function layers(collectionId?: string) {
   ).rows;
   for (const e of authored) {
     const view = await edgeView(e);
-    if (collectionId) {
+    if (collectionId || workIds?.length) {
       const belongs = async (ref: any) =>
         ref.kind === "work"
           ? ids.includes(ref.id)

@@ -67,6 +67,9 @@ export function LayersPage() {
         title="Inspect what each connection means"
         description="Citations, shared references, semantic proximity and interpretations answer different questions."
       />
+      <Link className="button secondary" to="/planning">
+        Arrange a persistent research map
+      </Link>
       <Link to="/knowledge?tab=connections">Create or review connections</Link>
       {data.isLoading && <Loading />}
       {data.error && <ErrorNotice error={data.error} />}

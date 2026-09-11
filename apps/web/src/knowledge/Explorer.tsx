@@ -1,3 +1,4 @@
+import { CandidateFeedback } from "../planning/Monitor";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -44,6 +45,7 @@ export function ExplorerPage() {
             setResult(
               await send("/discovery", {
                 query,
+                ...(collectionId ? { collectionId } : {}),
                 seeds: [...lines(seeds), ...localSeeds],
                 direction,
                 sources,
@@ -56,6 +58,17 @@ export function ExplorerPage() {
           }, "Discovery finished. Review provider coverage and results.");
         }}
       >
+        <Choice
+          label="Feedback collection context"
+          value={collectionId}
+          onChange={setCollection}
+          items={
+            collections.data?.items.filter(
+              (c) => c.collectionType !== "saved_search",
+            ) ?? []
+          }
+          empty="This question only"
+        />
         <Field label="Research question or topic">
           <input value={query} onChange={(e) => setQuery(e.target.value)} />
         </Field>
@@ -132,6 +145,10 @@ export function ExplorerPage() {
           <section className="review-panel">
             <h2>Source coverage</h2>
             <p>
+              {result.suppressed ?? 0} unchanged results suppressed by your
+              feedback.
+            </p>
+            <p>
               {result.limits} · {result.excluded} excluded results
             </p>
             {result.coverage.map((c: any, i: number) => (
@@ -206,6 +223,7 @@ export function ExplorerPage() {
                 <summary>Why this result appeared</summary>
                 <Json value={c.paths} />
               </details>
+              <CandidateFeedback runId={result.id} candidate={c} />
             </article>
           ))}
         </>

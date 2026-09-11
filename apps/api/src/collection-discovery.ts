@@ -1,3 +1,4 @@
+import { captureDigest,feedbackFor,retainCandidateSource,refreshWatchedSources } from './planning/monitor.js';
 import { z } from "zod";
 import { DiscoverySeed, type CollectionWork, type Work } from "@vani/shared";
 import { pool, query, transaction } from "./db.js";
@@ -188,6 +189,7 @@ export async function runDueCollections(repository: Repository) {
     for (const row of due.rows) {
       const seed = DiscoverySeed.parse(row.discovery);
       try {
+        await captureDigest(row.id);
         const since = row.last_discovery_at
           ? new Date(new Date(row.last_discovery_at).getTime() - 90 * 86400000)
               .toISOString()
@@ -198,12 +200,17 @@ export async function runDueCollections(repository: Repository) {
           config.openAlexEmail,
           since,
         );
-        for (const candidate of result.items) {
+        const filtered=await feedbackFor(result.items,'collection:'+row.id);
+        for (const candidate of filtered.items) {
           if (relevance(seed.topic, candidate.title, candidate.abstract) < 0.35)
             continue;
           const work = await repository.createWork(candidate);
+          await retainCandidateSource(work.id,candidate);
           await repository.addToCollection(row.id, [work.id]);
         }
+        const sourceChecks=await refreshWatchedSources(row.id);
+        result.warnings.push(...sourceChecks.warnings);
+        await captureDigest(row.id);
         await reviewMembers(repository, row.id);
         await query(
           "UPDATE collection SET last_discovery_at=now(),next_discovery_at=$2,discovery_error=$3 WHERE id=$1 AND discovery=$4::jsonb",

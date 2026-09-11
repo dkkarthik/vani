@@ -1,3 +1,4 @@
+import { feedbackFor,feedbackContext } from '../planning/monitor.js';
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { v7 as uuid } from "uuid";
@@ -13,6 +14,7 @@ import { manualCollection } from "../research/organization.js";
 const Input = z
   .object({
     query: z.string().trim().max(500).default(""),
+    collectionId: Id.optional(),
     seeds: z.array(z.string().trim().min(1).max(300)).max(5).default([]),
     direction: z.enum(["seed", "references", "citing", "both"]).default("both"),
     sources: z
@@ -248,7 +250,7 @@ export async function runDiscovery(input: z.infer<typeof Input>) {
     c.existingWorkId = existing?.id ?? null;
   }
   return {
-    items,
+    ...await feedbackFor(items,feedbackContext(input.query,input.seeds,input.collectionId)),
     coverage,
     excluded,
     bounded: true,
@@ -272,6 +274,7 @@ export async function registerDiscovery(
         coverage: data.coverage,
         excluded: data.excluded,
         limits: data.limits,
+          suppressed:data.suppressed,contextKey:data.contextKey,
       }),
     ]);
     return { id, ...data };

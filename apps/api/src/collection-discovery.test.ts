@@ -15,6 +15,7 @@ vi.mock("./db.js", () => ({
   },
   transaction: async (fn: any) => fn({ query: mocks.query }),
 }));
+vi.mock("./planning/monitor.js",()=>({captureDigest:vi.fn(async()=>({added:0})),feedbackFor:vi.fn(async(items:any[])=>({items})),retainCandidateSource:vi.fn(async()=>{}),refreshWatchedSources:vi.fn(async()=>({warnings:[]}))}));
 vi.mock("./connectors.js", () => ({ discoverCollection: mocks.discover }));
 vi.mock("./first-pass.js", () => ({
   synthesize: mocks.synthesize,

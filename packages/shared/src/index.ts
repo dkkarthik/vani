@@ -122,3 +122,4 @@ export const citationKey = (family: string, venue: string, year: number, suffix 
 export * from './research.js';
 
 export * from './knowledge.js';
+export * from './maps.js';
