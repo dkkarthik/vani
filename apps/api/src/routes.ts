@@ -1,3 +1,10 @@
+import { registerDocuments, passage } from './research/documents.js';
+import { registerEvidence } from './research/evidence.js';
+import { registerSearch } from './research/search.js';
+import { registerOrganization, manualCollection } from './research/organization.js';
+import { registerIdentity } from './research/identity.js';
+import { registerCleanup } from './research/cleanup.js';
+import { pool } from './db.js';
 import { registerImportRoutes } from './imports/service.js';
 import { registerMetadataRoutes } from './metadata-routes.js';
 import { createReadStream } from 'node:fs';
@@ -23,6 +30,8 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
+  await registerDocuments(app);await registerEvidence(app);await registerSearch(app);
+  await registerOrganization(app);await registerIdentity(app);await registerCleanup(app);
   await registerCaptureRoutes(app, repository);
   await registerImportRoutes(app,repository);
   await registerMetadataRoutes(app,repository);
@@ -49,7 +58,7 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
   app.get('/api/v1/collections/:id/members', async (request) => collectionMembers(repository,Id.parse((request.params as any).id)));
   app.post('/api/v1/collections/:id/discovery', async request => {
     const id=Id.parse((request.params as any).id);
-    return configureCollection(repository,id,DiscoverySeed.parse(request.body));
+    await manualCollection(pool,id);return configureCollection(repository,id,DiscoverySeed.parse(request.body));
   });
   app.post('/api/v1/collections/:id/seen', async (request,reply) => {
     const id=Id.parse((request.params as any).id);
@@ -70,12 +79,12 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
   });
   app.post('/api/v1/collections/:id/members', async (request) => {
     const id = Id.parse((request.params as any).id); const { workIds } = z.object({ workIds: z.array(z.string().uuid()).min(1) }).parse(request.body);
-    return { items: await repository.addToCollection(id, workIds) };
+    await manualCollection(pool,id);return { items: await repository.addToCollection(id, workIds) };
   });
   app.patch('/api/v1/collections/:id/members/:workId', async (request, reply) => {
     const params = z.object({ id: z.string().uuid(), workId: z.string().uuid() }).parse(request.params);
     const { status } = z.object({ status: z.enum(['inbox','to_read','skimming','reading','read','foundational','cited','rejected','archived']) }).parse(request.body);
-    await repository.updateMembership(params.id, params.workId, status); return reply.code(204).send();
+    await manualCollection(pool,params.id);await repository.updateMembership(params.id, params.workId, status); return reply.code(204).send();
   });
   app.post('/api/v1/collections/:id/exports', async (request, reply) => {
     const id = Id.parse((request.params as any).id); z.object({ format: z.enum(['bibtex']).default('bibtex') }).parse(request.body ?? {});
@@ -102,7 +111,8 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
   });
   app.post('/api/v1/relationships', async (request, reply) => {
     const input = z.object({ sourceId: z.string().uuid(), targetId: z.string().uuid(), predicate: z.enum(['semantically_similar','cites','cited_by','co_cited','bibliographic_coupling','uses_as_baseline','compares_against','evaluates_on','uses_method','extends','contradicts']),
-      confidence: z.number().min(0).max(1), verificationStatus: z.enum(['inferred','verified','rejected']), evidence: z.array(z.object({ exactText: z.string(), page: z.number().optional(), section: z.string().optional() })).optional() }).parse(request.body);
+      confidence: z.number().min(0).max(1), verificationStatus: z.enum(['inferred','verified','rejected']), evidence: z.array(z.object({ exactText: z.string(), passageId: z.string().uuid().optional(), page: z.number().optional(), section: z.string().optional() })).optional() }).parse(request.body);
+    for(const evidence of input.evidence??[])if(evidence.passageId)await passage(evidence.passageId);
     return reply.code(201).send({ id: await repository.createRelationship(input) });
   });
 
@@ -135,7 +145,7 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
     const workId = Id.parse((request.params as any).id);
     const result = await query<any>(`SELECT a.id,a.work_id,a.object_hash,a.filename,a.attachment_type,a.access_class,a.created_at,
       o.byte_size,o.mime_type FROM attachment a JOIN object_store o ON o.hash_sha256=a.object_hash
-      WHERE a.work_id=$1 ORDER BY a.created_at DESC`, [workId]);
+      WHERE canonical_work(a.work_id)=canonical_work($1) ORDER BY a.created_at DESC`, [workId]);
     return { items: result.rows };
   });
   app.get('/api/v1/attachments/:id/content', async (request, reply) => {

@@ -83,3 +83,31 @@
 .import-record-heading .check-line { font-size: 16px; color: var(--ink); margin-top: 0; }
 .review-panel a:not(.button) { color: #236b59; text-decoration: underline; text-underline-offset: 3px; }
 .review-panel .toolbar { gap: 12px; flex-wrap: wrap; }
+
+.research-filters { display:flex; flex-wrap:wrap; gap:14px; align-items:end; }
+.research-filters label { display:grid; gap:7px; font-size:12px; flex:1 1 170px; min-width:0; }
+.research-filters input,.research-filters select { width:100%; min-width:0; }
+.research-filters input,.research-filters select,.pdf-controls input,.pdf-controls select { border:1px solid var(--line); border-radius:7px; background:white; padding:9px; max-width:100%; }
+.research-work-list article,.evidence-card { border-bottom:1px solid var(--line); padding:16px 0; }
+.research-work-list small,.evidence-card small { display:block; margin:8px 0; overflow-wrap:anywhere; }
+.research-work-list .check-line { font-size:14px; text-transform:none; }
+.evidence-card .check-line { font-size:15px; text-transform:none; color:var(--ink); }
+.research-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.evidence-card blockquote { border-left:3px solid var(--green); padding:12px 18px; margin:12px 0; white-space:pre-wrap; max-height:300px; overflow:auto; background:var(--green-soft); }
+.pdf-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:14px 0; font-size:12px; }
+.pdf-controls label { display:flex; gap:8px; align-items:center; }
+.pdf-controls input[type=number] { width:75px; }
+.pdf-controls input[type=file] { max-width:230px; }
+.pdf-scroll { max-height:80vh; overflow:auto; background:#dde3e0; padding:20px; border-radius:8px; }
+.pdf-page-frame { position:relative; background:white; margin:auto; box-shadow:0 3px 12px #0002; }
+.pdf-page-frame canvas { display:block; }
+.pdf-page-frame .textLayer { z-index:2; }
+.pdf-marks { position:absolute; inset:0; z-index:3; pointer-events:none; }
+.pdf-mark { position:absolute; opacity:.3; mix-blend-mode:multiply; }
+.pdf-mark.active { outline:2px solid #186eac; opacity:.45; }
+.area-selector { position:absolute; inset:0; z-index:4; cursor:crosshair; touch-action:none; }
+.pdf-hits { display:flex; gap:8px; flex-wrap:wrap; max-height:160px; overflow:auto; }
+.reader-workspace { max-width:1600px; }
+.reader-workspace .review-panel a,.evidence-card a { text-decoration:underline; }
+.version-notice,.anchor-exact { padding:14px; border-left:3px solid var(--green); background:var(--green-soft); }
+@media(max-width:1100px) { .research-columns { grid-template-columns:1fr; } }

@@ -128,7 +128,7 @@ export function ImportsPage() {
                 onChange={(event) => setDestination(event.target.value)}
               >
                 <option value="">Choose a collection</option>
-                {collections.data?.items.map((collection) => (
+                {collections.data?.items.filter(collection=>collection.collectionType!=="saved_search").map((collection) => (
                   <option key={collection.id} value={collection.id}>
                     {collection.name}
                   </option>

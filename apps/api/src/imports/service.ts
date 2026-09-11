@@ -69,7 +69,7 @@ export class ImportRepository {
   ) {
     const hashes = item.attachments.map((file) => file.hash);
     const found = await client.query(
-      `SELECT DISTINCT w.id,w.title,w.doi FROM work w LEFT JOIN import_identity i ON i.work_id=w.id LEFT JOIN attachment a ON a.work_id=w.id WHERE w.deleted_at IS NULL AND (lower(w.doi)=$1 OR i.fingerprint=$2 OR a.object_hash=ANY($3::text[]))`,
+      `SELECT DISTINCT root.id,root.title,root.doi FROM work w JOIN work root ON root.id=canonical_work(w.id) LEFT JOIN import_identity i ON i.work_id=w.id LEFT JOIN attachment a ON a.work_id=w.id WHERE w.deleted_at IS NULL AND (lower(w.doi)=$1 OR i.fingerprint=$2 OR a.object_hash=ANY($3::text[]))`,
       [item.metadata?.doi ?? null, item.fingerprint, hashes],
     );
     if (found.rows.length > 1)
@@ -97,7 +97,7 @@ export class ImportRepository {
     if (
       !(
         await query(
-          "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL",
+          "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL AND collection_type='manual'",
           [collectionId],
         )
       ).rowCount
@@ -421,7 +421,7 @@ export class ImportRepository {
             if (
               !(
                 await client.query(
-                  "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL FOR KEY SHARE",
+                  "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL AND collection_type='manual' FOR KEY SHARE",
                   [session.collectionId],
                 )
               ).rowCount

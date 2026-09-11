@@ -66,6 +66,7 @@ export type CollectionWork = Work & { isNew: boolean; status: WorkStatus; firstP
 
 export const Collection = z.object({
   id: z.string(), name: z.string(), description: z.string().default(''),
+  collectionType: z.string().optional(),
   parentId: z.string().nullable(), memberCount: z.number().int().default(0),
   newCount: z.number().int().optional(), discovery: DiscoverySeed.nullable().optional(),
   nextDiscoveryAt: z.string().nullable().optional(), lastDiscoveryAt: z.string().nullable().optional(), discoveryError: z.string().nullable().optional(),
@@ -82,7 +83,7 @@ export type RelationshipPredicate = z.infer<typeof RelationshipPredicate>;
 export interface Relationship {
   id: string; sourceId: string; targetId: string; predicate: RelationshipPredicate;
   confidence: number; verificationStatus: 'inferred' | 'verified' | 'rejected';
-  evidence?: { exactText: string; page?: number; section?: string }[];
+  evidence?: { exactText: string; page?: number; section?: string; passageId?: string }[];
 }
 
 export interface SearchResult {
@@ -117,3 +118,5 @@ export const citationKey = (family: string, venue: string, year: number, suffix 
   const abbreviation = venue.toLowerCase().replace(/[^a-z0-9]/g, '') || 'misc';
   return `${author}-${abbreviation}${String(year).slice(-2)}${suffix}`;
 };
+
+export * from './research.js';

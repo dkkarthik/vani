@@ -1,3 +1,6 @@
+import { OrganizePage } from './pages/OrganizePage';
+import { EvidencePage, NotePage } from './pages/EvidencePage';
+import { SearchPage } from './pages/SearchPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { MetadataPage } from './pages/MetadataPage';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
@@ -14,7 +17,7 @@ import { ReaderPage } from './pages/ReaderPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const navigation=[
-  ['Collections','/collections',Boxes],['Discover','/discover',Compass],['Map','/map',Map],['Read','/read',BookOpen],['Ask VANI','/ask',MessageCircle],['Library','/library',Library],['Settings','/settings',Settings]
+  ['Collections','/collections',Boxes],['Discover','/discover',Compass],['Map','/map',Map],['Read','/read',BookOpen],['Ask VANI','/ask',MessageCircle],['Library','/library',Library],['Organize','/organize',Boxes],['Evidence','/evidence',FileText],['Search','/search',Search],['Settings','/settings',Settings]
 ] as const;
 
 export function App(){
@@ -33,7 +36,7 @@ export function App(){
         <div className="context-actions">
           <label className="collection-select"><span>Scope</span><select aria-label="Active collection" value={collectionId??''} onChange={e=>setCollectionId(e.target.value||undefined)}><option value="">All library</option>{collections?.items.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
           <div className="selection-pill" title="Selected papers"><FileText size={14}/>{selected.length} selected</div>
-          <button className="icon-button" aria-label="Search"><Search size={17}/></button>
+          <NavLink className="icon-button" aria-label="Search" to="/search"><Search size={17}/></NavLink>
         </div>
       </header>
       <div className="route-stage"><Routes>
@@ -42,6 +45,7 @@ export function App(){
         <Route path="/discover" element={<DiscoverPage/>}/>
         <Route path="/map" element={<MapPage/>}/>
         <Route path="/read" element={<ReaderPage/>}/>
+        <Route path="/organize" element={<OrganizePage/>}/><Route path="/evidence" element={<EvidencePage/>}/><Route path="/search" element={<SearchPage/>}/><Route path="/notes/:noteId" element={<NotePage/>}/><Route path="/passages/:passageId" element={<ReaderPage/>}/>
         <Route path="/read/:workId" element={<ReaderPage/>}/>
         <Route path="/ask" element={<AskPage/>}/>
         <Route path="/imports" element={<ImportsPage/>}/>

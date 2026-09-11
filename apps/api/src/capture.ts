@@ -112,7 +112,7 @@ export class CaptureRepository {
   async forWork(workId: string) {
     return (
       await query<CaptureRow>(
-        `${select} WHERE c.work_id=$1 ORDER BY c.created_at DESC LIMIT 50`,
+        `${select} WHERE canonical_work(c.work_id)=canonical_work($1) ORDER BY c.created_at DESC LIMIT 50`,
         [workId],
       )
     ).rows.map(resultOf);
@@ -136,7 +136,7 @@ export class CaptureRepository {
         return;
       }
       const collection = await client.query(
-        "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL FOR KEY SHARE",
+        "SELECT id FROM collection WHERE id=$1 AND deleted_at IS NULL AND collection_type='manual' FOR KEY SHARE",
         [input.collectionId],
       );
       if (!collection.rowCount)
@@ -327,7 +327,7 @@ export async function registerCaptureRoutes(
       return resolveCaptureDoi(doi.toLowerCase());
     });
     scoped.get("/api/v1/capture/collections", async () => ({
-      items: await repository.listCollections(),
+      items: (await repository.listCollections()).filter(c=>c.collectionType!=="saved_search"),
     }));
     scoped.post("/api/v1/capture/collections", async (request, reply) =>
       reply

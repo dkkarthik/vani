@@ -1,0 +1,46 @@
+/* Scoped geometry rules for the PDF.js TextLayer API.
+ * Text is transparent because the original glyphs are rendered on the canvas. */
+.pdf-page-frame .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.pdf-page-frame .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+.pdf-page-frame .textLayer > :not(.markedContent),
+.pdf-page-frame .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+.pdf-page-frame .textLayer .markedContent {
+  display: contents;
+}
+.pdf-page-frame .textLayer span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+.pdf-page-frame .textLayer ::selection {
+  background: rgb(0 90 200 / 0.25);
+  color: transparent;
+}

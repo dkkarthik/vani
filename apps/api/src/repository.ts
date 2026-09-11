@@ -1,3 +1,5 @@
+import { libraryWhere } from './research/organization.js';
+import { LibraryRule } from '@vani/shared';
 import { v7 as uuidv7 } from 'uuid';
 import type { PoolClient } from 'pg';
 import type { Collection, GraphProjection, Relationship, Work, WorkStatus } from '@vani/shared';
@@ -56,9 +58,9 @@ export class Repository {
 
   async listWorks({ q = '', collectionId, limit = 100, offset = 0 }: { q?: string; collectionId?: string; limit?: number; offset?: number } = {}) {
     const values: unknown[] = [];
-    const where = ['w.deleted_at IS NULL'];
-    let join = '';
-    if (collectionId) { values.push(collectionId); join = 'JOIN collection_membership cm_filter ON cm_filter.work_id = w.id'; where.push(`cm_filter.collection_id = $${values.length}`); }
+    const where = ['w.deleted_at IS NULL','w.merged_into IS NULL'];
+    const join = '';
+    if(collectionId){const scope=await libraryWhere(LibraryRule.parse({}),collectionId);values.push(...scope.values);where.push(...scope.where);}
     if (q) { values.push(q); where.push(`(w.search_vector @@ websearch_to_tsquery('english', $${values.length}) OR w.normalized_title % lower($${values.length}))`); }
     values.push(Math.min(limit, 500));
     values.push(Math.max(0,offset));
@@ -67,7 +69,7 @@ export class Repository {
   }
 
   async getWork(id: string, client?: PoolClient) {
-    const result = await (client ?? pool).query<WorkRow>(`${workSelect} WHERE w.id = $1 AND w.deleted_at IS NULL GROUP BY w.id, v.id`, [id]);
+    const result = await (client ?? pool).query<WorkRow>(`${workSelect} WHERE w.id = canonical_work($1) AND w.deleted_at IS NULL GROUP BY w.id, v.id`, [id]);
     return result.rows[0] ? rowToWork(result.rows[0]) : null;
   }
 
@@ -132,8 +134,12 @@ export class Repository {
   async listCollections(): Promise<Collection[]> {
     const result = await query<any>(`SELECT c.*, count(cm.work_id)::int AS member_count,
       count(cm.work_id) FILTER (WHERE cm.seen_at IS NULL)::int AS new_count FROM collection c
-      LEFT JOIN collection_membership cm ON cm.collection_id=c.id WHERE c.deleted_at IS NULL GROUP BY c.id ORDER BY c.created_at`);
-    return result.rows.map((row) => ({ id: row.id, name: row.name, description: row.description, parentId: row.parent_id,
+      LEFT JOIN collection_membership cm ON cm.collection_id=c.id AND EXISTS(SELECT 1 FROM work w WHERE w.id=cm.work_id AND w.merged_into IS NULL AND w.deleted_at IS NULL) WHERE c.deleted_at IS NULL GROUP BY c.id ORDER BY c.created_at`);
+    for(const row of result.rows)if(row.collection_type==='saved_search'){
+      const scope=await libraryWhere(LibraryRule.parse({}),row.id);
+      row.member_count=(await query<any>(`SELECT count(*)::int AS count FROM work w WHERE ${scope.where.join(' AND ')}`,scope.values)).rows[0]!.count;row.new_count=0;
+    }
+    return result.rows.map((row) => ({ id: row.id, name: row.name, description: row.description, parentId: row.parent_id, collectionType: row.collection_type,
       memberCount: row.member_count, newCount: row.new_count, discovery: row.discovery,
       nextDiscoveryAt: row.next_discovery_at?.toISOString() ?? null, lastDiscoveryAt: row.last_discovery_at?.toISOString() ?? null,
       discoveryError: row.discovery_error, createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() }));
@@ -163,29 +169,26 @@ export class Repository {
   }
 
   async search(q: string, collectionId?: string) {
-    const works = await this.listWorks({ q, collectionId, limit: 50 });
-    return works.map((work, index) => ({ work, rank: index + 1, score: Math.max(0.3, 1 - index * 0.06),
-      features: { lexical: Math.max(0.2, 0.95 - index * 0.05), semantic: Math.max(0.2, 0.82 - index * 0.03), citation: 0, userProfile: collectionId ? 0.7 : 0.2 },
-      whyShown: [`Matches “${q}” in stored title or abstract`, collectionId ? 'Within the active collection' : 'Across your library'] }));
+    const ranked=await query<any>(`SELECT w.id,ts_rank_cd(w.search_vector,websearch_to_tsquery('english',$1)) AS rank FROM work w WHERE w.deleted_at IS NULL AND w.merged_into IS NULL AND w.search_vector @@ websearch_to_tsquery('english',$1) AND ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM collection_membership cm WHERE cm.work_id=w.id AND cm.collection_id=$2)) ORDER BY rank DESC,w.id LIMIT 50`,[q,collectionId??null]);
+    return Promise.all(ranked.rows.map(async(row,index)=>({work:(await this.getWork(row.id))!,rank:index+1,score:row.rank,features:{lexical:row.rank,semantic:0,citation:0,userProfile:0},whyShown:['PostgreSQL full-text match in title/abstract; use Evidence search for passages and configured semantic retrieval.']})));
   }
 
   async graph(collectionId?: string, workId?: string, limit = 200): Promise<GraphProjection> {
-    const values: unknown[] = [];
-    const filters: string[] = ['w.deleted_at IS NULL'];
-    let membershipJoin = '';
-    if (collectionId) { values.push(collectionId); membershipJoin = 'JOIN collection_membership cm ON cm.work_id=w.id'; filters.push(`cm.collection_id=$${values.length}`); }
-    if (workId) { values.push(workId); filters.push(`(w.id=$${values.length} OR EXISTS(SELECT 1 FROM typed_relationship rr WHERE (rr.source_work_id=$${values.length} AND rr.target_work_id=w.id) OR (rr.target_work_id=$${values.length} AND rr.source_work_id=w.id)))`); }
-    values.push(limit + 1);
-    const membershipStatus = collectionId ? 'cm.status' : 'NULL::text AS status';
-    const rows = await query<any>(`SELECT w.id,w.title,w.year,w.abstract,v.abbreviation AS venue,
-      COALESCE(NULLIF(w.source_metadata->>'salientContribution',''), w.abstract) AS gist,${membershipStatus} FROM work w ${membershipJoin}
-      LEFT JOIN venue v ON v.id=w.venue_id WHERE ${filters.join(' AND ')} ORDER BY w.year DESC NULLS LAST LIMIT $${values.length}`, values);
-    const selected = rows.rows.slice(0, limit);
-    const ids = selected.map((row) => row.id);
-    const edgeRows = ids.length ? await query<any>('SELECT * FROM typed_relationship WHERE source_work_id=ANY($1::uuid[]) AND target_work_id=ANY($1::uuid[])', [ids]) : { rows: [] };
-    return { nodes: selected.map((row) => ({ id: row.id, label: row.title, year: row.year, venue: row.venue ?? '', gist: row.gist ?? row.abstract ?? '', status: row.status ?? undefined })),
-      edges: edgeRows.rows.map((row): Relationship => ({ id: row.id, sourceId: row.source_work_id, targetId: row.target_work_id, predicate: row.predicate,
-        confidence: row.confidence, verificationStatus: row.verification_status, evidence: row.evidence })), truncated: rows.rows.length > limit };
+    const scope=await libraryWhere(LibraryRule.parse({}),collectionId);
+    const values=scope.values,filters=scope.where;
+    if(workId){values.push(workId);const ref='$'+values.length;filters.push(`(w.id=canonical_work(${ref}) OR EXISTS(SELECT 1 FROM typed_relationship rr WHERE (canonical_work(rr.source_work_id)=canonical_work(${ref}) AND canonical_work(rr.target_work_id)=w.id) OR (canonical_work(rr.target_work_id)=canonical_work(${ref}) AND canonical_work(rr.source_work_id)=w.id)))`);}
+    let membershipStatus='NULL::text AS status';
+    if(collectionId){values.push(collectionId);membershipStatus=`(SELECT cm.status FROM collection_membership cm WHERE cm.work_id=w.id AND cm.collection_id=$${values.length} LIMIT 1) AS status`;}
+    values.push(limit+1);
+    const rows=await query<any>(`SELECT w.id,w.title,w.year,w.abstract,v.abbreviation AS venue,COALESCE(NULLIF(w.source_metadata->>'salientContribution',''),w.abstract) AS gist,${membershipStatus} FROM work w LEFT JOIN venue v ON v.id=w.venue_id WHERE ${filters.join(' AND ')} ORDER BY w.year DESC NULLS LAST,w.id LIMIT $${values.length}`,values);
+    const selected=rows.rows.slice(0,limit),ids=selected.map(row=>row.id);
+    const edgeRows=ids.length?await query<any>('SELECT *,canonical_work(source_work_id) AS canonical_source,canonical_work(target_work_id) AS canonical_target FROM typed_relationship WHERE canonical_work(source_work_id)=ANY($1::uuid[]) AND canonical_work(target_work_id)=ANY($1::uuid[]) ORDER BY id',[ids]):{rows:[]};
+    const edges=new Map<string,Relationship>();
+    for(const row of edgeRows.rows){if(row.canonical_source===row.canonical_target)continue;const key=[row.canonical_source,row.canonical_target,row.predicate].join(':');const prior=edges.get(key);
+      if(prior)prior.evidence=[...new Map([...(prior.evidence??[]),...row.evidence].map(value=>[JSON.stringify(value),value])).values()] as Relationship['evidence'];
+      else edges.set(key,{id:row.id,sourceId:row.canonical_source,targetId:row.canonical_target,predicate:row.predicate,confidence:row.confidence,verificationStatus:row.verification_status,evidence:row.evidence});
+    }
+    return {nodes:selected.map(row=>({id:row.id,label:row.title,year:row.year,venue:row.venue??'',gist:row.gist??'',status:row.status??undefined})),edges:[...edges.values()],truncated:rows.rows.length>limit};
   }
 
   async createRelationship(input: Omit<Relationship, 'id'>) {
@@ -206,7 +209,7 @@ export class Repository {
   async listNotes(collectionId?: string, workId?: string) {
     const clauses = ['deleted_at IS NULL']; const values: unknown[] = [];
     if (collectionId) { values.push(collectionId); clauses.push(`collection_id=$${values.length}`); }
-    if (workId) { values.push(workId); clauses.push(`work_id=$${values.length}`); }
+    if (workId) { values.push(workId); clauses.push(`canonical_work(work_id)=canonical_work($${values.length})`); }
     return (await query<any>(`SELECT * FROM note WHERE ${clauses.join(' AND ')} ORDER BY updated_at DESC`, values)).rows;
   }
 

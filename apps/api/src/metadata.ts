@@ -94,7 +94,7 @@ export function verification(
         )));
   return reviewed && identity && enough ? "verified" : "partial";
 }
-function canonical(work: any): MetadataFields {
+export function canonical(work: any): MetadataFields {
   const input = {
     ...work,
     venue: work.venue === "Unknown venue" ? "" : work.venue,
@@ -132,6 +132,7 @@ export class MetadataRepository {
     return work;
   }
   async get(workId: string): Promise<MetadataDocument> {
+    const resolved=await transaction(client=>client.query("SELECT canonical_work($1) AS id",[workId]));if(!resolved.rows[0]?.id)fail(404,"Paper not found.");workId=resolved.rows[0].id;
     return transaction(async (client) => {
       await client.query("SELECT id FROM work WHERE id=$1 FOR UPDATE", [
         workId,
@@ -142,11 +143,11 @@ export class MetadataRepository {
         [workId],
       );
       const assertions = await client.query(
-        "SELECT * FROM metadata_assertion WHERE work_id=$1 ORDER BY created_at DESC,id DESC",
+        "SELECT * FROM metadata_assertion WHERE canonical_work(work_id)=$1 ORDER BY created_at DESC,id DESC",
         [workId],
       );
       const decisions = await client.query(
-        "SELECT * FROM metadata_decision WHERE work_id=$1 ORDER BY revision DESC,created_at DESC",
+        "SELECT * FROM metadata_decision WHERE canonical_work(work_id)=$1 ORDER BY revision DESC,created_at DESC",
         [workId],
       );
       const fields = canonical(work);
@@ -176,7 +177,7 @@ export class MetadataRepository {
 
   private async lock(client: PoolClient, id: string, revision: number) {
     const result = await client.query(
-      "SELECT version,metadata_locks FROM work WHERE id=$1 AND deleted_at IS NULL FOR UPDATE",
+      "SELECT version,metadata_locks FROM work WHERE id=$1 AND deleted_at IS NULL AND merged_into IS NULL FOR UPDATE",
       [id],
     );
     if (!result.rows[0]) fail(404, "Paper not found.");
@@ -187,7 +188,7 @@ export class MetadataRepository {
       );
     return result.rows[0].metadata_locks as string[];
   }
-  private async write(
+  async write(
     client: PoolClient,
     id: string,
     before: MetadataFields,
@@ -368,7 +369,7 @@ export class MetadataRepository {
       let locks = await this.lock(client, id, revision);
       const work = await this.baseline(id, client);
       const result = await client.query(
-        "SELECT * FROM metadata_assertion WHERE id=$1 AND work_id=$2",
+        "SELECT * FROM metadata_assertion WHERE id=$1 AND canonical_work(work_id)=$2",
         [assertionId, id],
       );
       if (!result.rows[0])

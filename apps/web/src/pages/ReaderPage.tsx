@@ -1,17 +1,246 @@
-import { CaptureSources } from '../components/CaptureSources';
-import { useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { BookOpen, FileUp, Highlighter, Link2, MessageCircle, Save, Search, StickyNote } from 'lucide-react';
-import { api } from '../api';
-import { useWorkspace } from '../context';
-import { EmptyState, ErrorNotice, Loading, PageHeader, VerificationBadge } from '../components/ui';
-
-export function ReaderPage(){const {workId}=useParams();const workspace=useWorkspace();const id=workId??workspace.selected[0]?.id;const [tab,setTab]=useState<'notes'|'citation'>('notes');const [note,setNote]=useState('');const fileRef=useRef<HTMLInputElement>(null);const client=useQueryClient();const work=useQuery({queryKey:['work',id],queryFn:()=>api.work(id!),enabled:Boolean(id)});const notes=useQuery({queryKey:['notes',id],queryFn:()=>api.notes(undefined,id),enabled:Boolean(id)});const attachments=useQuery({queryKey:['attachments',id],queryFn:async()=>{const r=await fetch(`/api/v1/works/${id}/attachments`);if(!r.ok)throw new Error('Could not load attachments');return r.json() as Promise<{items:any[]}>},enabled:Boolean(id)});
-const upload=useMutation({mutationFn:(file:File)=>api.uploadPdf(id!,file),onSuccess:()=>client.invalidateQueries({queryKey:['attachments',id]})});const save=useMutation({mutationFn:()=>api.createNote({title:`Reading notes — ${work.data?.citationKey}`,markdown:note,noteType:'source',workId:id}),onSuccess:()=>{setNote('');client.invalidateQueries({queryKey:['notes',id]})}});const attachment=attachments.data?.items[0];
-if(!id)return <div className="page"><PageHeader title="Read" description="A version-aware place to read, annotate, and connect evidence."/><EmptyState icon={<BookOpen/>} title="Choose a paper to begin" body="Select a paper in a collection or the library, then return here."/></div>;
-if(work.isLoading)return <Loading/>;if(work.error)return <ErrorNotice error={work.error}/>;if(!work.data)return null;
-return <div className="reader-page"><header className="reader-header"><div><div className="eyebrow">{work.data.manifestationType.replaceAll('_',' ')} · {work.data.year}</div><h1>{work.data.title}</h1><div className="reader-meta"><span>{work.data.authors.map(a=>a.family).join(', ')}</span><VerificationBadge status={work.data.verificationStatus}/><code>{work.data.citationKey}</code></div></div><div className="reader-tools"><Link className="button secondary" to={`/works/${id}/metadata`}>Review metadata</Link><button className="icon-button"><Search size={17}/></button><button className="icon-button"><Highlighter size={17}/></button><input ref={fileRef} hidden type="file" accept="application/pdf" onChange={e=>e.target.files?.[0]&&upload.mutate(e.target.files[0])}/><button className="button secondary" onClick={()=>fileRef.current?.click()}><FileUp size={16}/>{attachment?'Replace PDF':'Attach PDF'}</button></div></header>
-<div className="reader-layout"><aside className="outline"><div className="panel-title"><BookOpen size={15}/><strong>Paper outline</strong></div>{['Abstract','Introduction','Related work','Method','Experiments','Limitations','References'].map((section,i)=><button className={i===0?'active':''} key={section}><span>{String(i+1).padStart(2,'0')}</span>{section}</button>)}<div className="document-fingerprint"><span>Document identity</span><code>{attachment?.object_hash?.slice(0,16)??'No PDF hash'}…</code><small>{work.data.manifestationType}</small></div></aside>
-<main className="document-view">{upload.isPending?<Loading label="Hashing and storing the original PDF…"/>:attachment?<iframe title={work.data.title} src={`/api/v1/attachments/${attachment.id}/content#view=FitH`}/>:<div className="reflow-paper"><div className="paper-sheet"><h2>{work.data.title}</h2><p className="byline">{work.data.authors.map(a=>`${a.given} ${a.family}`).join(', ')}</p><h3>Abstract</h3><p>{work.data.abstract||'No abstract is available. Attach the PDF to begin reading and annotating.'}</p><button className="upload-drop" onClick={()=>fileRef.current?.click()}><FileUp/><strong>Attach the paper PDF</strong><span>The immutable original is stored by SHA-256.</span></button></div></div>}</main>
-<aside className="evidence-pane"><div className="tab-row"><button className={tab==='notes'?'active':''} onClick={()=>setTab('notes')}><StickyNote size={14}/>Notes</button><button className={tab==='citation'?'active':''} onClick={()=>setTab('citation')}><Link2 size={14}/>Citation</button></div>{tab==='notes'?<><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Capture a claim, question, limitation, or connection…" rows={6}/><button className="button primary full" onClick={()=>save.mutate()} disabled={!note.trim()||save.isPending}><Save size={14}/>Save note</button><div className="saved-notes">{notes.data?.items.map(item=><article key={item.id}><strong>{item.title}</strong><p>{item.markdown}</p></article>)}</div></>:<div className="citation-card"><VerificationBadge status={work.data.verificationStatus}/><code>{work.data.citationKey}</code><dl><dt>Title</dt><dd>{work.data.title}</dd><dt>Venue</dt><dd>{work.data.venue}</dd><dt>DOI</dt><dd>{work.data.doi??'Not verified'}</dd></dl></div>}<CaptureSources workId={id}/><a className="ask-link" href={`/ask?work=${id}`}><MessageCircle size={16}/><span><strong>Ask about this paper</strong><small>Use its evidence in context</small></span></a></aside></div></div>}
+import { lazy, Suspense, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, request } from "../api";
+import { useWorkspace } from "../context";
+import { ErrorNotice, Loading, PageHeader } from "../components/ui";
+const PdfReader = lazy(() =>
+  import("../components/PdfReader").then((module) => ({
+    default: module.PdfReader,
+  })),
+);
+import { CaptureSources } from "../components/CaptureSources";
+export function ReaderPage() {
+  const { workId, passageId } = useParams(),
+    [params] = useSearchParams(),
+    workspace = useWorkspace(),
+    client = useQueryClient();
+  const [chosen, setChosen] = useState(""),
+    [note, setNote] = useState("");
+  const anchor = useQuery({
+    queryKey: ["passage", passageId],
+    queryFn: () => request<any>("/passages/" + passageId),
+    enabled: Boolean(passageId),
+  });
+  const id = anchor.data?.work_id ?? workId ?? workspace.selected[0]?.id;
+  const work = useQuery({
+    queryKey: ["work", id],
+    queryFn: () => api.work(id!),
+    enabled: Boolean(id),
+  });
+  const attachments = useQuery({
+    queryKey: ["attachments", id],
+    queryFn: () => request<any>(`/works/${id}/attachments`),
+    enabled: Boolean(id),
+  });
+  const notes = useQuery({
+    queryKey: ["notes", id],
+    queryFn: () => api.notes(undefined, id),
+    enabled: Boolean(id),
+  });
+  const graph = useQuery({
+    queryKey: ["reader-relations", id],
+    queryFn: () => api.graph(undefined, id),
+    enabled: Boolean(id),
+  });
+  const versions = useQuery({
+    queryKey: ["versions", id],
+    queryFn: () => request<any>(`/works/${id}/versions`),
+    enabled: Boolean(id),
+  });
+  const mutation = useMutation({
+    mutationFn: ({ file }: { file?: File }) =>
+      file
+        ? api.uploadPdf(id!, file)
+        : api.createNote({
+            title: `Reading notes — ${work.data?.citationKey}`,
+            markdown: note,
+            workId: id,
+          }),
+    onSuccess: () => {
+      client.invalidateQueries();
+      setNote("");
+    },
+  });
+  if (anchor.error)
+    return (
+      <div className="page">
+        <ErrorNotice error={anchor.error} />
+        <Link to="/library">Back to library</Link>
+      </div>
+    );
+  if ((passageId && anchor.isLoading) || work.isLoading) return <Loading />;
+  if (!id)
+    return (
+      <div className="page">
+        <PageHeader
+          title="Read"
+          description="Choose a paper in your library."
+        />
+        <Link to="/library">Open library</Link>
+      </div>
+    );
+  const error = work.error || attachments.error || mutation.error;
+  const attachmentId =
+    anchor.data?.attachment_id ||
+    chosen ||
+    params.get("attachment") ||
+    attachments.data?.items[0]?.id;
+  const validAttachment = attachments.data?.items.find(
+    (a: any) => a.id === attachmentId,
+  );
+  return (
+    <div className="page reader-workspace">
+      <PageHeader
+        eyebrow="F07–F08 · Source reading"
+        title={work.data?.title ?? "Read"}
+        description={work.data?.citationKey}
+        actions={
+          <Link
+            className="button secondary"
+            to={`/works/${work.data?.id ?? id}/metadata`}
+          >
+            Review metadata
+          </Link>
+        }
+      />
+      {error && <ErrorNotice error={error} />}
+      {versions.data?.items.map((v: any) => (
+        <p
+          className={
+            v.relation === "retracts" ? "error-notice" : "version-notice"
+          }
+          key={v.id}
+        >
+          <span>
+            User-recorded relationship:{" "}
+            <Link to={`/read/${v.source_id}`}>{v.source_title}</Link>{" "}
+            <strong>{v.relation}</strong>{" "}
+            <Link to={`/read/${v.target_id}`}>{v.target_title}</Link> —{" "}
+            {v.reason} {v.source_url && <a href={v.source_url}>Evidence</a>}
+          </span>
+        </p>
+      ))}
+      {versions.data?.aliases.length > 0 && (
+        <details>
+          <summary>Preserved original records and citation keys</summary>
+          {versions.data.aliases.map((a: any) => (
+            <p key={a.id}>
+              {a.citation_key} — {a.title}
+            </p>
+          ))}
+        </details>
+      )}
+      <div className="pdf-controls">
+        <label>
+          Document version
+          <select
+            aria-label="Document version"
+            value={attachmentId ?? ""}
+            disabled={Boolean(passageId)}
+            onChange={(e) => setChosen(e.target.value)}
+          >
+            {attachments.data?.items.map((a: any) => (
+              <option value={a.id} key={a.id}>
+                {a.filename} · {a.object_hash.slice(0, 12)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="button secondary">
+          Add PDF version
+          <input
+            type="file"
+            accept=".pdf"
+            disabled={mutation.isPending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) mutation.mutate({ file });
+            }}
+          />
+        </label>
+      </div>
+      {attachmentId && validAttachment ? (
+        <Suspense fallback={<Loading label="Loading PDF reader…" />}>
+          <PdfReader
+            key={attachmentId}
+            attachmentId={attachmentId}
+            initialPage={
+              anchor.data?.selector.page ??
+              (Number(params.get("page")) || undefined)
+            }
+            focus={anchor.data}
+          />
+        </Suspense>
+      ) : attachmentId ? (
+        <p className="review-warnings">
+          The requested document is not attached to this paper. Choose an
+          available version.
+        </p>
+      ) : (
+        <div className="review-panel">
+          <h2>Abstract</h2>
+          <p>
+            {work.data?.abstract ||
+              "No PDF attached yet. Add a PDF version to read and annotate."}
+          </p>
+        </div>
+      )}
+      <section className="review-panel">
+        <h2>Reading notes</h2>
+        <form
+          className="stack-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            mutation.mutate({});
+          }}
+        >
+          <label>
+            New note
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          <button
+            className="button primary"
+            disabled={!note.trim() || mutation.isPending}
+          >
+            Save note
+          </button>
+        </form>
+        {notes.data?.items.map((n: any) => (
+          <article className="decision-row" key={n.id}>
+            <Link to={`/notes/${n.id}`}>{n.title}</Link>
+            <p style={{ whiteSpace: "pre-wrap" }}>{n.markdown}</p>
+            {Array.from(
+              n.markdown.matchAll(/\/passages\/([a-f0-9-]{36})/g),
+            ).map((m: any) => (
+              <Link key={m[1]} to={`/passages/${m[1]}`}>
+                Open linked passage
+              </Link>
+            ))}
+          </article>
+        ))}
+      </section>
+      <section className="review-panel">
+        <h2>Relationship evidence</h2>
+        {graph.data?.edges
+          .filter((edge) => edge.evidence?.some((e) => e.passageId))
+          .map((edge) => (
+            <article className="decision-row" key={edge.id}>
+              <strong>{edge.predicate.replaceAll("_", " ")}</strong>
+              {edge.evidence?.map((e, i) => (
+                <p key={i}>
+                  {e.exactText}{" "}
+                  {e.passageId && (
+                    <Link to={`/passages/${e.passageId}`}>
+                      Open supporting passage
+                    </Link>
+                  )}
+                </p>
+              ))}
+            </article>
+          ))}
+      </section>
+      <CaptureSources workId={work.data?.id ?? id} />
+    </div>
+  );
+}

@@ -20,7 +20,8 @@
     "check": "npm run typecheck && npm test && npm run build",
     "extension:package": "npm run build -w @vani/shared && npm run package -w @vani/extension",
     "extension:smoke": "npm run build -w @vani/shared && npm run build -w @vani/extension && node scripts/extension-smoke.mjs",
-    "research:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/research-smoke.mjs"
+    "research:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/research-smoke.mjs",
+    "workspace:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/workspace-smoke.mjs"
   },
   "engines": {
     "node": ">=22"
