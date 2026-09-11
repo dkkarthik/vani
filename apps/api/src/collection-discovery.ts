@@ -1,3 +1,4 @@
+import { runDeepRefresh } from "./deep-refresh.js";
 import { defaultKeywords, keywordMatch } from "./collection-focus.js";
 import { seedFocus } from "./seed-focus.js";
 import { queueEnrichment, runEnrichment } from "./ingestion/enrichment.js";
@@ -319,6 +320,7 @@ export function startDiscoveryWorker(
     if (running) return;
     running = true;
     try {
+      await runDeepRefresh(repository);
       await runEnrichment();
       await runDueCollections(repository);
     } catch (error) {

@@ -1,3 +1,4 @@
+import { registerDeepRefresh } from "./deep-refresh.js";
 import { registerCollectionFocus } from "./collection-focus.js";
 import { registerIngestion } from './ingestion/service.js';
 import { queueEnrichment } from './ingestion/enrichment.js';
@@ -36,6 +37,7 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
   const objects = new ObjectStore();
   await registerIngestion(app,repository);
   await registerCollectionFocus(app);
+  await registerDeepRefresh(app,repository);
   await registerKnowledge(app,repository);
   await registerDocuments(app);await registerEvidence(app);await registerSearch(app);
   await registerOrganization(app);await registerIdentity(app);await registerCleanup(app);

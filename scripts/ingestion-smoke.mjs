@@ -24,6 +24,31 @@ const bytes = Buffer.concat([
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const url = new URL(String(input));
+  if (url.hostname === "api.openalex.org") {
+    if (url.searchParams.has("search")) return Response.json({ results: [] });
+    if (url.pathname.includes("/works/"))
+      return Response.json({
+        id: "https://openalex.org/W" + stamp,
+        referenced_works: [],
+      });
+    return Response.json({ results: [] });
+  }
+  if (
+    url.hostname === "api.crossref.org" &&
+    url.searchParams.has("query.bibliographic")
+  )
+    return Response.json({
+      message: {
+        items: [
+          {
+            title: ["Efficient learning for reliable control " + stamp],
+            DOI: "10.1234/deep" + stamp,
+            abstract: "We improve efficient learning for reliable control.",
+            published: { "date-parts": [[1990]] },
+          },
+        ],
+      },
+    });
   if (url.hostname === "api.crossref.org")
     return Response.json({
       message: {
@@ -216,6 +241,43 @@ try {
     path: resolve(output, "keywords-and-reasons.png"),
     fullPage: true,
   });
+  const collectionId = await field("Active collection").inputValue();
+  await pool.query(
+    "UPDATE collection SET discovery=jsonb_set(discovery,'{enabled}','false'::jsonb) WHERE id=$1",
+    [collectionId],
+  );
+  const schedule = (
+    await pool.query(
+      "SELECT discovery,next_discovery_at FROM collection WHERE id=$1",
+      [collectionId],
+    )
+  ).rows[0];
+  await button("Deep refresh").click();
+  await page
+    .getByText("Deep refresh complete", { exact: true })
+    .waitFor({ timeout: 30000 });
+  await page
+    .getByText("Efficient learning for reliable control " + stamp, {
+      exact: true,
+    })
+    .waitFor();
+  await page
+    .getByText("Deep refresh via crossref:", { exact: false })
+    .waitFor();
+  await page.getByText("1 paper added", { exact: false }).waitFor();
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT discovery,next_discovery_at FROM collection WHERE id=$1",
+        [collectionId],
+      )
+    ).rows[0],
+    schedule,
+  );
+  await page.screenshot({
+    path: resolve(output, "deep-refresh.png"),
+    fullPage: true,
+  });
   const attachment = (
     await pool.query(
       "SELECT o.storage_path FROM attachment a JOIN object_store o ON o.hash_sha256=a.object_hash WHERE a.work_id=$1",
@@ -240,6 +302,7 @@ try {
           "unavailable PDF and abstract fallback",
           "visible keyword add/remove/persistence",
           "upload and link inclusion reasons",
+          "manual deep refresh, live additions and reason, paused daily schedule preserved",
         ],
       },
       null,

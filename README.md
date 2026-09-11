@@ -56,6 +56,8 @@ See [Collection ingestion](docs/20-collection-ingestion.md) to add PDFs or paper
 
 See [Collection keywords and inclusion reasons](docs/21-collection-keywords.md) to tune automatic discovery and inspect why each paper joined a collection.
 
+See [Manual deep refresh](docs/22-manual-deep-refresh.md) to search broadly and update a collection on demand without changing its daily schedule.
+
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis

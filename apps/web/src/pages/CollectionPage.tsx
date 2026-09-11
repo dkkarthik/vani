@@ -1,3 +1,4 @@
+import { DeepRefresh } from "../components/DeepRefresh";
 import { CollectionKeywords } from "../components/CollectionKeywords";
 import { AddCollectionPaper } from "../components/AddCollectionPaper";
 import { request } from "../api";
@@ -120,10 +121,6 @@ export function CollectionPage() {
     onSuccess: () =>
       client.invalidateQueries({ queryKey: ["collection-members"] }),
   });
-  const refresh = useMutation({
-    mutationFn: () => api.refreshCollection(collectionId!),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["collections"] }),
-  });
   const retry = useMutation({
     mutationFn: (workId: string) => api.retryFirstPass(collectionId!, workId),
     onSuccess: () => {
@@ -220,14 +217,10 @@ export function CollectionPage() {
           >
             {active?.discovery ? "Edit discovery" : "Configure discovery"}
           </button>
-          <button
-            className="button secondary"
-            disabled={!active?.discovery?.enabled || refresh.isPending}
-            onClick={() => refresh.mutate()}
-          >
-            Search now
-          </button>
         </section>
+      )}
+      {collectionId && active?.collectionType !== "saved_search" && (
+        <DeepRefresh key={"refresh:" + collectionId} id={collectionId} />
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
         <CollectionKeywords
@@ -246,10 +239,6 @@ export function CollectionPage() {
         />
       )}
       {enrichmentRetry.error && <ErrorNotice error={enrichmentRetry.error} />}
-      {refresh.isSuccess && (
-        <p role="status">Search queued; the worker checks every minute.</p>
-      )}
-      {refresh.error && <ErrorNotice error={refresh.error} />}{" "}
       {status.error && <ErrorNotice error={status.error} />}
       <div className="stats-row">
         <div>
@@ -363,7 +352,9 @@ export function CollectionPage() {
                   {Boolean(work.currentKeywordMatches) && (
                     <small>
                       Current keyword overlap:{" "}
-                      {work.currentKeywordMatches!.length ? work.currentKeywordMatches!.join(", ") : "none in the title or abstract"}
+                      {work.currentKeywordMatches!.length
+                        ? work.currentKeywordMatches!.join(", ")
+                        : "none in the title or abstract"}
                     </small>
                   )}
                   {work.inclusionReason?.kind === "automatic" && (
