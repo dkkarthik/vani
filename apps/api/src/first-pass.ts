@@ -10,6 +10,7 @@ export async function synthesize<T>(
   evidence: unknown,
   schema: z.ZodType<T>,
   privateEvidence = false,
+  timeoutMs = 60000,
 ): Promise<{ value: T; provider: string }> {
   // Uploaded manuscripts never leave the machine; a local model is used for those.
   const remote = Boolean(config.openAiKey) && !privateEvidence;
@@ -46,7 +47,7 @@ export async function synthesize<T>(
               options: { temperature: 0.1 },
             },
       ),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(timeoutMs),
     },
   );
   if (!response.ok)

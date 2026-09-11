@@ -19,3 +19,7 @@ Collection rows show local PDF status and the primary contribution with coverage
 ## Verification
 
 Unit tests cover URL validation, metadata parsing and contribution extraction. Disposable database integration tests cover uploads, links, duplicate ingestion, additive seeding, PDF storage, provider failure, retry and worker summaries. Browser checks cover new/existing collection upload/link forms, seed refinement and visible PDF/contribution status. Run relevant workspace checks, commit and push.
+
+## Model-independent seed setup correction
+
+Saving seed papers must not depend on a model being available. Bound topic synthesis to twelve seconds. On failure, use a single descriptive paper title or shared informative seed-text terms as an explicitly labeled, editable search query. If useful terms cannot be derived, persist the collection and seeds with discovery paused and a visible request for a manual focus. Preserve explicit topic overrides. Store the focus method and explanation in discovery configuration; no database migration is needed.

@@ -111,13 +111,14 @@ try {
       .isChecked(),
     true,
   );
-  await field("Focused topic (optional override)").fill(
-    "Demonstration learning for reliable control",
-  );
+  await field("Focused topic (optional override)").fill("");
   await button("Save and build collection").click();
   await page
     .getByRole("heading", { name: "Collection discovery", exact: true })
     .waitFor({ state: "hidden" });
+  await page
+    .getByText("Using search terms from your seed papers", { exact: false })
+    .waitFor();
   await enrichPaper(result.work.id);
   await page.reload();
   await field("Active collection").selectOption({

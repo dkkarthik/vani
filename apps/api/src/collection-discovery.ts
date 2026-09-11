@@ -1,3 +1,4 @@
+import { seedFocus } from "./seed-focus.js";
 import { queueEnrichment, runEnrichment } from "./ingestion/enrichment.js";
 import {
   captureDigest,
@@ -43,6 +44,7 @@ export async function configureCollection(
   );
   if (!exists)
     throw Object.assign(new Error("Collection not found"), { statusCode: 404 });
+  seed = { ...seed, topicSource: "manual", topicNotice: "" };
   if (seed.mode === "papers") {
     const works = await Promise.all(
       seed.workIds.map((workId) => repository.getWork(workId)),
@@ -52,41 +54,53 @@ export async function configureCollection(
         new Error("Seed papers must be existing scholarly records"),
         { statusCode: 400 },
       );
-    if (!seed.topic) {
+    if (!seed.topic.trim()) {
+      const evidence = await Promise.all(
+        works.map(async (work) => ({
+          title: work!.title,
+          abstract: work!.abstract,
+          localExcerpt:
+            (
+              await query<any>(
+                `SELECT d.pages FROM attachment a JOIN document_index d ON d.object_hash=a.object_hash WHERE canonical_work(a.work_id)=$1 ORDER BY a.created_at DESC LIMIT 1`,
+                [work!.id],
+              )
+            ).rows[0]?.pages
+              ?.slice(0, 3)
+              .map((p: any) => p.text)
+              .join("\n")
+              .slice(0, 12000) ?? "",
+        })),
+      );
       try {
         const result = await synthesize(
-          "Infer ONE moderately narrow, coherent research topic shared by these seed papers. Specify the problem, method or setting, not a broad discipline. Return JSON {topic:string}. Do not fabricate a common theme for unrelated papers; return an empty topic if there is none.",
-          await Promise.all(
-            works.map(async (work) => ({
-              title: work!.title,
-              abstract: work!.abstract,
-              localExcerpt:
-                (
-                  await query<any>(
-                    `SELECT d.pages FROM attachment a JOIN document_index d ON d.object_hash=a.object_hash WHERE canonical_work(a.work_id)=$1 ORDER BY a.created_at DESC LIMIT 1`,
-                    [work!.id],
-                  )
-                ).rows[0]?.pages
-                  ?.slice(0, 3)
-                  .map((p: any) => p.text)
-                  .join("\n")
-                  .slice(0, 12000) ?? "",
-            })),
-          ),
+          "Infer ONE moderately narrow, coherent research topic shared by these seed papers. Specify the problem, method or setting. Return JSON {topic:string}. Return an empty topic if there is no common theme.",
+          evidence,
           z.object({ topic: z.string().trim().min(2).max(500) }),
           true,
+          12000,
         );
-        seed = { ...seed, topic: result.value.topic };
+        seed = {
+          ...seed,
+          topic: result.value.topic,
+          topicSource: "model",
+          topicNotice: "",
+        };
       } catch {
-        throw Object.assign(
-          new Error(
-            "Could not synthesize a coherent topic. Configure a model or enter a focused topic alongside the seed papers.",
-          ),
-          { statusCode: 422 },
-        );
+        const topic = seedFocus(evidence);
+        seed = {
+          ...seed,
+          topic,
+          topicSource: topic ? "extractive" : "needs_focus",
+          enabled: topic ? seed.enabled : false,
+          topicNotice: topic
+            ? "Using search terms from your seed papers because model synthesis was unavailable. Review or edit this focus in Edit discovery."
+            : "Your papers and collection are saved. Enter a focused topic in Edit discovery to enable searches; there was not enough shared text to derive useful search terms.",
+        };
       }
     }
   }
+
   await transaction(async (client) => {
     await client.query(
       "UPDATE collection SET discovery=$2,next_discovery_at=now(),discovery_error=NULL,updated_at=now() WHERE id=$1",

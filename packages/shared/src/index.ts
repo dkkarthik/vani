@@ -46,6 +46,7 @@ export const Work = z.object({
 export type Work = z.infer<typeof Work>;
 
 export const DiscoverySeed = z.object({
+  topicSource: z.enum(['manual','model','extractive','needs_focus']).optional(), topicNotice: z.string().max(1000).optional(),
   mode: z.enum(['topic', 'papers']), topic: z.string().trim().max(500).default(''),
   workIds: z.array(z.string().uuid()).max(10).default([]),
   timezone: z.string().default('America/New_York').refine(value => {

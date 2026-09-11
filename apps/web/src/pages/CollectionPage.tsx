@@ -202,6 +202,9 @@ export function CollectionPage() {
                 ? new Date(active.nextDiscoveryAt).toLocaleString()
                 : "Not scheduled"}
             </small>
+            {active?.discovery?.topicNotice && (
+              <p role="status">{active.discovery.topicNotice}</p>
+            )}
             {active?.discoveryError && (
               <p role="alert">{active.discoveryError}</p>
             )}
@@ -340,7 +343,8 @@ export function CollectionPage() {
                   }}
                 >
                   First pass ·{" "}
-                  {work.firstPass?.status.replaceAll("_", " ") ?? "not generated"}
+                  {work.firstPass?.status.replaceAll("_", " ") ??
+                    "not generated"}
                 </button>
                 {work.enrichment && (
                   <div>

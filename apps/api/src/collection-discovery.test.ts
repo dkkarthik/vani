@@ -126,19 +126,40 @@ describe("living collections", () => {
       ),
     ).toBe(true);
   });
-  it("does not silently guess a topic when synthesis fails", async () => {
+  it("saves a labeled extractive focus when the model is unavailable", async () => {
     mocks.synthesize.mockRejectedValue(new Error("offline"));
-    await expect(
-      configureCollection(
-        {
-          listCollections: async () => [{ id: "c" }],
-          getWork: async () => work,
-        } as unknown as Repository,
-        "c",
-        { ...seed, mode: "papers", topic: "", workIds: [work.id] },
+    const result = await configureCollection(
+      {
+        listCollections: async () => [{ id: "c" }],
+        getWork: async () => work,
+      } as unknown as Repository,
+      "c",
+      { ...seed, mode: "papers", topic: "", workIds: [work.id] },
+    );
+    expect(result.topic).toBe("Active robotic mapping");
+    expect(result.topicSource).toBe("extractive");
+    expect(result.topicNotice).toContain("model synthesis was unavailable");
+    expect(result.enabled).toBe(true);
+    expect(
+      mocks.query.mock.calls.some(([sql]) =>
+        String(sql).startsWith("UPDATE collection"),
       ),
-    ).rejects.toMatchObject({ statusCode: 422 });
-    expect(mocks.query.mock.calls.every(([sql])=>String(sql).startsWith("SELECT"))).toBe(true);
+    ).toBe(true);
+  });
+  it("saves inadequate seed text with discovery paused instead of inventing a focus", async () => {
+    mocks.synthesize.mockRejectedValue(new Error("offline"));
+    const result = await configureCollection(
+      {
+        listCollections: async () => [{ id: "c" }],
+        getWork: async () => ({ ...work, title: "paper.pdf", abstract: "" }),
+      } as unknown as Repository,
+      "c",
+      { ...seed, mode: "papers", topic: "", workIds: [work.id] },
+    );
+    expect(result.topic).toBe("");
+    expect(result.enabled).toBe(false);
+    expect(result.topicSource).toBe("needs_focus");
+    expect(result.workIds).toEqual([work.id]);
   });
   it("acknowledges exact rendered memberships only", async () => {
     await acknowledgeMembers("c", [work.id]);

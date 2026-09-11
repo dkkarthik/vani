@@ -63,10 +63,10 @@ export function CollectionSeedForm({
       {mode === "papers" && (
         <>
           <p>
-            Select up to 10 papers. VANI will synthesize a moderately narrow
-            topic from their titles and abstracts. Add PDFs or paper links
-            directly from the collection. Uploaded seed papers also contribute
-            local text excerpts.
+            Select up to 10 papers. VANI will derive a focus from their text. If
+            the local model is unavailable, it uses labeled search terms that
+            you can edit. Add PDFs or paper links directly from the collection.
+            Uploaded seed papers also contribute local text excerpts.
           </p>
           <label>
             Find seed papers
@@ -118,7 +118,7 @@ export function CollectionSeedForm({
           placeholder={
             mode === "topic"
               ? "e.g. Uncertainty-aware active mapping for subterranean robots"
-              : "Leave empty to synthesize from the seed papers"
+              : "Leave empty to derive a focus from the seed papers"
           }
         />
       </label>
@@ -163,7 +163,7 @@ export function CollectionSeedForm({
       </label>
       <small>
         Searches run while the API server is running, with catch-up after
-        downtime. Seed focus synthesis uses your local model; uploaded PDFs stay
+        downtime. A model is optional. Uploaded PDFs and focus extraction stay
         local.
       </small>
       {error && <ErrorNotice error={error} />}
