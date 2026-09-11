@@ -8,7 +8,7 @@ import { config } from './config.js';
 
 export async function buildApp(repository = new Repository()) {
   const app = Fastify({ logger: { level: config.env === 'test' ? 'silent' : 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] }, genReqId: (request) => request.headers['x-request-id']?.toString() ?? crypto.randomUUID() });
-  await app.register(cors, { origin: config.webOrigin, methods: ['GET','POST','PATCH','DELETE','OPTIONS'] });
+  await app.register(cors, { origin: config.webOrigin, methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'] });
   await app.register(multipart);
   await registerRoutes(app, repository);
   app.setErrorHandler((error, request, reply) => {

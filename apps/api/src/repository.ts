@@ -94,6 +94,20 @@ export class Repository {
     const venue = input.venue?.trim() || 'Unknown venue';
     const run = client ? <T>(fn: (client: PoolClient) => Promise<T>) => fn(client) : transaction;
     return run(async (client) => {
+      // Serialise identity/key allocation, including callers importing concurrently.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('vani-work-create'))");
+      if (input.connector && input.externalId) {
+        const match = await client.query<{id:string}>('SELECT canonical_work(s.work_id) AS id FROM source_record s JOIN work w ON w.id=s.work_id WHERE s.connector=$1 AND s.external_id=$2 AND w.deleted_at IS NULL LIMIT 1', [input.connector,input.externalId]);
+        if (match.rows[0]) return match.rows[0].id;
+      }
+      if (doi) {
+        const match = await client.query<{id:string}>('SELECT canonical_work(id) AS id FROM work WHERE lower(doi)=$1 AND deleted_at IS NULL', [doi]);
+        if (match.rows[0]) return match.rows[0].id;
+      }
+      if (input.connector && !doi && input.deduplicateByTitle !== false) {
+        const match = await client.query<{id:string}>('SELECT canonical_work(id) AS id FROM work WHERE normalized_title=$1 AND year IS NOT DISTINCT FROM $2 AND deleted_at IS NULL LIMIT 1', [normalizeTitle(input.title),input.year ?? null]);
+        if (match.rows[0]) return match.rows[0].id;
+      }
       let venueRow = await client.query<{ id: string; abbreviation: string }>('SELECT id, abbreviation FROM venue WHERE lower(canonical_name) = lower($1) LIMIT 1', [venue]);
       if (!venueRow.rows[0]) {
         const id = uuidv7();

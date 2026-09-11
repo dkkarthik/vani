@@ -1,3 +1,4 @@
+import { registerKnowledge } from './knowledge/index.js';
 import { registerDocuments, passage } from './research/documents.js';
 import { registerEvidence } from './research/evidence.js';
 import { registerSearch } from './research/search.js';
@@ -30,6 +31,7 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
+  await registerKnowledge(app,repository);
   await registerDocuments(app);await registerEvidence(app);await registerSearch(app);
   await registerOrganization(app);await registerIdentity(app);await registerCleanup(app);
   await registerCaptureRoutes(app, repository);

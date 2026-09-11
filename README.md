@@ -48,6 +48,8 @@ See [Import research and review metadata (F02/F03)](docs/16-import-and-metadata.
 
 See [Research workspace (F04–F10)](docs/17-research-workspace.md) for duplicate/version review, nested and saved collections, batch undo, PDF annotations, durable passage links, evidence reuse, and hybrid search.
 
+See [Connected research (F11–F20)](docs/18-connected-research.md) for contextual notes, reading plans, entity curation, typed connections, argument outlines, sourced comparison tables, seed discovery and distinct graph layers.
+
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis

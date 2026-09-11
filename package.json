@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "VANI \u2014 Visualizing Academic Networks and Ideas",
+  "description": "VANI — Visualizing Academic Networks and Ideas",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -21,7 +21,8 @@
     "extension:package": "npm run build -w @vani/shared && npm run package -w @vani/extension",
     "extension:smoke": "npm run build -w @vani/shared && npm run build -w @vani/extension && node scripts/extension-smoke.mjs",
     "research:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/research-smoke.mjs",
-    "workspace:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/workspace-smoke.mjs"
+    "workspace:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/workspace-smoke.mjs",
+    "connected:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/connected-smoke.mjs"
   },
   "engines": {
     "node": ">=22"

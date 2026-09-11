@@ -90,7 +90,7 @@ export async function mergeWorks(
       [uuid(), sourceId, targetId, "merge", JSON.stringify(preview)],
     );
     await client.query(
-      "INSERT INTO collection_membership(collection_id,work_id,status,priority,rationale,ordinal,seen_at) SELECT collection_id,$2,status,priority,rationale,ordinal,seen_at FROM collection_membership WHERE canonical_work(work_id)=$1 ON CONFLICT DO NOTHING",
+      "INSERT INTO collection_membership(collection_id,work_id,status,priority,rationale,ordinal,seen_at,question,queued) SELECT collection_id,$2,status,priority,rationale,ordinal,seen_at,question,queued FROM collection_membership WHERE canonical_work(work_id)=$1 ON CONFLICT DO NOTHING",
       [sourceId, targetId],
     );
     const relations = (

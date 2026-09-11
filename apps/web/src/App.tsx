@@ -1,5 +1,10 @@
+import { lazy, Suspense } from 'react';
+const KnowledgePage=lazy(()=>import('./knowledge/KnowledgePage').then(m=>({default:m.KnowledgePage})));
+const NoteEditorPage=lazy(()=>import('./knowledge/Notes').then(m=>({default:m.NoteEditorPage})));
+const ExplorerPage=lazy(()=>import('./knowledge/Explorer').then(m=>({default:m.ExplorerPage})));
+const LayersPage=lazy(()=>import('./knowledge/Layers').then(m=>({default:m.LayersPage})));
 import { OrganizePage } from './pages/OrganizePage';
-import { EvidencePage, NotePage } from './pages/EvidencePage';
+import { EvidencePage } from './pages/EvidencePage';
 import { SearchPage } from './pages/SearchPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { MetadataPage } from './pages/MetadataPage';
@@ -10,14 +15,13 @@ import { api } from './api';
 import { useWorkspace } from './context';
 import { CollectionPage } from './pages/CollectionPage';
 import { DiscoverPage } from './pages/DiscoverPage';
-import { MapPage } from './pages/MapPage';
 import { AskPage } from './pages/AskPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { ReaderPage } from './pages/ReaderPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const navigation=[
-  ['Collections','/collections',Boxes],['Discover','/discover',Compass],['Map','/map',Map],['Read','/read',BookOpen],['Ask VANI','/ask',MessageCircle],['Library','/library',Library],['Organize','/organize',Boxes],['Evidence','/evidence',FileText],['Search','/search',Search],['Settings','/settings',Settings]
+  ['Collections','/collections',Boxes],['Discover','/discover',Compass],['Map','/map',Map],['Read','/read',BookOpen],['Ask VANI','/ask',MessageCircle],['Library','/library',Library],['Organize','/organize',Boxes],['Evidence','/evidence',FileText],['Search','/search',Search],['Knowledge','/knowledge',Boxes],['Settings','/settings',Settings]
 ] as const;
 
 export function App(){
@@ -39,20 +43,20 @@ export function App(){
           <NavLink className="icon-button" aria-label="Search" to="/search"><Search size={17}/></NavLink>
         </div>
       </header>
-      <div className="route-stage"><Routes>
+      <div className="route-stage"><Suspense fallback={<p className="page" role="status">Loading workspace…</p>}><Routes>
         <Route path="/" element={<Navigate to="/collections" replace/>}/>
         <Route path="/collections" element={<CollectionPage/>}/>
-        <Route path="/discover" element={<DiscoverPage/>}/>
-        <Route path="/map" element={<MapPage/>}/>
+        <Route path="/knowledge" element={<KnowledgePage/>}/><Route path="/explore" element={<ExplorerPage/>}/><Route path="/discover" element={<DiscoverPage/>}/>
+        <Route path="/map" element={<LayersPage/>}/>
         <Route path="/read" element={<ReaderPage/>}/>
-        <Route path="/organize" element={<OrganizePage/>}/><Route path="/evidence" element={<EvidencePage/>}/><Route path="/search" element={<SearchPage/>}/><Route path="/notes/:noteId" element={<NotePage/>}/><Route path="/passages/:passageId" element={<ReaderPage/>}/>
+        <Route path="/organize" element={<OrganizePage/>}/><Route path="/evidence" element={<EvidencePage/>}/><Route path="/search" element={<SearchPage/>}/><Route path="/notes/:noteId" element={<NoteEditorPage/>}/><Route path="/passages/:passageId" element={<ReaderPage/>}/>
         <Route path="/read/:workId" element={<ReaderPage/>}/>
         <Route path="/ask" element={<AskPage/>}/>
         <Route path="/imports" element={<ImportsPage/>}/>
         <Route path="/works/:workId/metadata" element={<MetadataPage/>}/>
         <Route path="/library" element={<LibraryPage/>}/>
         <Route path="/settings" element={<SettingsPage/>}/>
-      </Routes></div>
+      </Routes></Suspense></div>
     </main>
   </div>
 }
