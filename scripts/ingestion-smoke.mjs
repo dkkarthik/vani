@@ -187,6 +187,35 @@ try {
     path: resolve(output, "existing-collection.png"),
     fullPage: true,
   });
+  await page
+    .getByRole("heading", { name: "Collection keywords", exact: true })
+    .waitFor();
+  await field("Add collection keyword").fill("unwantedtopic");
+  await button("Add keyword").click();
+  await button("Remove keyword unwantedtopic").waitFor();
+  await button("Remove keyword unwantedtopic").click();
+  await button("Remove keyword unwantedtopic").waitFor({ state: "hidden" });
+  await page.reload();
+  await field("Active collection").selectOption({
+    label: "Ingestion browser " + stamp,
+  });
+  await page
+    .getByRole("heading", { name: "Collection keywords", exact: true })
+    .waitFor();
+  assert.equal(await button("Remove keyword unwantedtopic").count(), 0);
+  await page
+    .getByText("You uploaded this PDF to the collection.", { exact: false })
+    .waitFor();
+  await page
+    .getByText("You added this paper through a paper link or DOI.", {
+      exact: false,
+    })
+    .waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: resolve(output, "keywords-and-reasons.png"),
+    fullPage: true,
+  });
   const attachment = (
     await pool.query(
       "SELECT o.storage_path FROM attachment a JOIN object_store o ON o.hash_sha256=a.object_hash WHERE a.work_id=$1",
@@ -209,6 +238,8 @@ try {
           "preserved seeds",
           "focus refinement",
           "unavailable PDF and abstract fallback",
+          "visible keyword add/remove/persistence",
+          "upload and link inclusion reasons",
         ],
       },
       null,

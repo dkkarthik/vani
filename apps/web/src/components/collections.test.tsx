@@ -19,6 +19,7 @@ vi.mock("../context", () => ({
   }),
 }));
 vi.mock("../api", () => ({
+  request:vi.fn(async()=>({keywords:[],version:1,edited:false})),
   api: {
     collections: vi.fn(),
     collectionMembers: vi.fn(),

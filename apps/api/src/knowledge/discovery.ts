@@ -335,7 +335,7 @@ export async function registerDiscovery(
       await queueEnrichment(work!.id);
       items.push({ resultId: c.resultId, work });
       if (d.collectionId)
-        await repository.addToCollection(d.collectionId, [work!.id]);
+        await repository.addToCollection(d.collectionId, [work!.id],{kind:"selected_discovery",text:"You selected this recommendation from Explorer.",provider:c.connector,paths:c.paths??[],runId:id});
     }
     // Citation facts only when both endpoints exist locally; provider payload is the evidence.
     const records = (

@@ -1,4 +1,4 @@
-import { queueEnrichment } from './ingestion/enrichment.js';
+import { queueEnrichment } from "./ingestion/enrichment.js";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -183,7 +183,7 @@ export class CaptureRepository {
         ],
       );
       await client.query(
-        "INSERT INTO collection_membership(collection_id,work_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
+        `INSERT INTO collection_membership(collection_id,work_id,inclusion_reason) VALUES($1,$2,'{"kind":"capture","text":"You saved this paper to the collection with browser capture."}') ON CONFLICT DO NOTHING`,
         [input.collectionId, work.id],
       );
       await client.query(
@@ -203,7 +203,7 @@ export class CaptureRepository {
         ],
       );
     });
-    const saved=(await this.get(input.id))!;
+    const saved = (await this.get(input.id))!;
     await queueEnrichment(saved.workId);
     return saved;
   }
@@ -258,7 +258,7 @@ export class CaptureRepository {
         [capture.workId],
       );
     });
-    await queueEnrichment(capture.workId,true);
+    await queueEnrichment(capture.workId, true);
     return (await this.get(id))!;
   }
   async pdfFailed(id: string, message: string) {
@@ -331,7 +331,9 @@ export async function registerCaptureRoutes(
       return resolveCaptureDoi(doi.toLowerCase());
     });
     scoped.get("/api/v1/capture/collections", async () => ({
-      items: (await repository.listCollections()).filter(c=>c.collectionType!=="saved_search"),
+      items: (await repository.listCollections()).filter(
+        (c) => c.collectionType !== "saved_search",
+      ),
     }));
     scoped.post("/api/v1/capture/collections", async (request, reply) =>
       reply

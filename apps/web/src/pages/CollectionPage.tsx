@@ -1,3 +1,4 @@
+import { CollectionKeywords } from "../components/CollectionKeywords";
 import { AddCollectionPaper } from "../components/AddCollectionPaper";
 import { request } from "../api";
 import { useEffect, useRef, useState } from "react";
@@ -98,6 +99,7 @@ export function CollectionPage() {
     },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["collections"] });
+      client.invalidateQueries({ queryKey: ["collection-keywords"] });
       client.invalidateQueries({ queryKey: ["collection-members"] });
       setShowSeed(false);
     },
@@ -228,6 +230,12 @@ export function CollectionPage() {
         </section>
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
+        <CollectionKeywords
+          key={"keywords:" + collectionId}
+          id={collectionId}
+        />
+      )}
+      {collectionId && active?.collectionType !== "saved_search" && (
         <AddCollectionPaper
           key={collectionId}
           collectionId={collectionId}
@@ -346,6 +354,34 @@ export function CollectionPage() {
                   {work.firstPass?.status.replaceAll("_", " ") ??
                     "not generated"}
                 </button>
+                <div>
+                  <p>
+                    <strong>Why this paper: </strong>
+                    {work.inclusionReason?.text ??
+                      "The original inclusion reason was not recorded."}
+                  </p>
+                  {Boolean(work.currentKeywordMatches) && (
+                    <small>
+                      Current keyword overlap:{" "}
+                      {work.currentKeywordMatches!.length ? work.currentKeywordMatches!.join(", ") : "none in the title or abstract"}
+                    </small>
+                  )}
+                  {work.inclusionReason?.kind === "automatic" && (
+                    <details>
+                      <summary>Original discovery evidence</summary>
+                      <p>Search: {work.inclusionReason.query}</p>
+                      {work.inclusionReason.evidence?.map((e, i) => (
+                        <blockquote key={i}>
+                          {e.quote}
+                          <br />
+                          <small>
+                            {e.field} · {e.keyword}
+                          </small>
+                        </blockquote>
+                      ))}
+                    </details>
+                  )}
+                </div>
                 {work.enrichment && (
                   <div>
                     <small>

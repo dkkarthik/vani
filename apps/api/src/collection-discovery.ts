@@ -1,3 +1,4 @@
+import { defaultKeywords, keywordMatch } from "./collection-focus.js";
 import { seedFocus } from "./seed-focus.js";
 import { queueEnrichment, runEnrichment } from "./ingestion/enrichment.js";
 import {
@@ -102,13 +103,14 @@ export async function configureCollection(
   }
 
   await transaction(async (client) => {
-    await client.query(
-      "UPDATE collection SET discovery=$2,next_discovery_at=now(),discovery_error=NULL,updated_at=now() WHERE id=$1",
+    const saved = await client.query(
+      "UPDATE collection SET discovery=CASE WHEN keywords IS NOT NULL AND cardinality(keywords)=0 THEN jsonb_set($2::jsonb,'{enabled}','false') ELSE $2::jsonb END,next_discovery_at=now(),discovery_error=NULL,updated_at=now() WHERE id=$1 RETURNING discovery",
       [id, JSON.stringify(seed)],
     );
+    seed = saved.rows[0]?.discovery ?? seed;
     for (const workId of seed.workIds)
       await client.query(
-        "INSERT INTO collection_membership(collection_id,work_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
+        `INSERT INTO collection_membership(collection_id,work_id,inclusion_reason) VALUES($1,$2,'{"kind":"seed","text":"You selected this paper as a collection seed."}') ON CONFLICT DO NOTHING`,
         [id, workId],
       );
   });
@@ -130,11 +132,18 @@ export async function collectionMembers(
     if (page.length < 500) break;
   }
   const metadata = await query<any>(
-    `SELECT cm.work_id,cm.seen_at,cm.status,fp.report,to_jsonb(pe) enrichment FROM collection_membership cm
+    `SELECT cm.work_id,cm.seen_at,cm.status,cm.inclusion_reason,fp.report,to_jsonb(pe) enrichment FROM collection_membership cm
     LEFT JOIN paper_enrichment pe ON pe.work_id=canonical_work(cm.work_id)
     LEFT JOIN paper_first_pass fp ON fp.collection_id=cm.collection_id AND fp.work_id=cm.work_id WHERE cm.collection_id=$1`,
     [id],
   );
+  const focus = (
+    await query<any>("SELECT keywords,discovery FROM collection WHERE id=$1", [
+      id,
+    ])
+  ).rows[0];
+  const keywords =
+    focus?.keywords ?? defaultKeywords(focus?.discovery?.topic ?? "");
   return {
     items: works.map((work) => {
       const row = metadata.rows.find((item) => item.work_id === work.id);
@@ -144,6 +153,12 @@ export async function collectionMembers(
         status: row?.status ?? "inbox",
         firstPass: row?.report,
         enrichment: row?.enrichment,
+        inclusionReason: row?.inclusion_reason ?? {
+          kind: "legacy",
+          text: "The original reason was not recorded for this existing collection member.",
+        },
+        currentKeywordMatches: keywordMatch(keywords, work.title, work.abstract)
+          .matched,
       };
     }),
   };
@@ -218,7 +233,7 @@ export async function runDueCollections(repository: Repository) {
     );
     if (!lock.rows[0]?.locked) return;
     const due =
-      await client.query<any>(`SELECT id,discovery,last_discovery_at FROM collection WHERE deleted_at IS NULL
+      await client.query<any>(`SELECT id,discovery,last_discovery_at,keywords,keyword_version FROM collection WHERE deleted_at IS NULL
       AND discovery->>'enabled'='true' AND next_discovery_at<=now() ORDER BY next_discovery_at`);
     for (const row of due.rows) {
       const seed = DiscoverySeed.parse(row.discovery);
@@ -229,8 +244,11 @@ export async function runDueCollections(repository: Repository) {
               .toISOString()
               .slice(0, 10)
           : undefined;
+        const keywords = row.keywords ?? defaultKeywords(seed.topic);
+        if (!keywords.length) continue;
+        const searchQuery = keywords.join(" ");
         const result = await discoverCollection(
-          seed.topic,
+          searchQuery,
           config.openAlexEmail,
           since,
         );
@@ -239,11 +257,31 @@ export async function runDueCollections(repository: Repository) {
           "collection:" + row.id,
         );
         for (const candidate of filtered.items) {
-          if (relevance(seed.topic, candidate.title, candidate.abstract) < 0.35)
-            continue;
+          const match = keywordMatch(
+            keywords,
+            candidate.title,
+            candidate.abstract,
+          );
+          if (match.score < 0.35) continue;
           const work = await repository.createWork(candidate);
           await retainCandidateSource(work.id, candidate);
-          await repository.addToCollection(row.id, [work.id]);
+          await repository.addToCollection(
+            row.id,
+            [work.id],
+            {
+              kind: "automatic",
+              text: `Discovered via ${candidate.connector}: matched ${match.matched.join(", ")} (${match.matched.length}/${keywords.length} active keywords; minimum 35%).`,
+              keywords,
+              query: searchQuery,
+              matched: match.matched,
+              score: match.score,
+              evidence: match.evidence,
+              provider: candidate.connector,
+              at: new Date().toISOString(),
+            },
+            row.keyword_version,
+            JSON.stringify(row.discovery),
+          );
           await queueEnrichment(work.id);
         }
         const sourceChecks = await refreshWatchedSources(row.id);

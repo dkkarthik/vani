@@ -123,8 +123,8 @@ export async function addIngestedPaper(
     ).rows[0];
     if (!row) throw Error("Collection no longer exists.");
     await db.query(
-      "INSERT INTO collection_membership(collection_id,work_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
-      [collectionId, work.id],
+      "INSERT INTO collection_membership(collection_id,work_id,inclusion_reason) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+      [collectionId, work.id,JSON.stringify({kind:input.bytes?"upload":"link",text:input.bytes?"You uploaded this PDF to the collection.":"You added this paper through a paper link or DOI.",sourceUrl:source||undefined})],
     );
     if (input.seed) {
       const current = row.discovery ?? {

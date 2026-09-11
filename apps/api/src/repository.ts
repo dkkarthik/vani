@@ -165,10 +165,11 @@ export class Repository {
     return (await this.listCollections()).find((item) => item.id === id)!;
   }
 
-  async addToCollection(collectionId: string, workIds: string[]) {
+  async addToCollection(collectionId: string, workIds: string[],reason:Record<string,unknown>={kind:"manual",text:"You added this paper to the collection."},keywordVersion?:number,discoverySnapshot?:string) {
     await transaction(async (client) => {
-      for (const [ordinal, workId] of workIds.entries()) await client.query(`INSERT INTO collection_membership(collection_id,work_id,ordinal)
-        VALUES($1,$2,$3) ON CONFLICT(collection_id,work_id) DO NOTHING`, [collectionId, workId, ordinal]);
+      await client.query("SELECT id FROM collection WHERE id=$1 FOR SHARE",[collectionId]);
+      for (const [ordinal, workId] of workIds.entries()) await client.query(`INSERT INTO collection_membership(collection_id,work_id,ordinal,inclusion_reason)
+        SELECT $1,$2,$3,$4 FROM collection c WHERE c.id=$1 AND c.deleted_at IS NULL AND ($5::integer IS NULL OR (c.keyword_version=$5 AND c.discovery=$6::jsonb AND c.discovery->>'enabled'='true')) ON CONFLICT(collection_id,work_id) DO NOTHING`, [collectionId, workId, ordinal,JSON.stringify(reason),keywordVersion??null,discoverySnapshot??null]);
     });
     return this.listWorks({ collectionId });
   }

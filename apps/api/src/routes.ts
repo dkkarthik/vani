@@ -1,3 +1,4 @@
+import { registerCollectionFocus } from "./collection-focus.js";
 import { registerIngestion } from './ingestion/service.js';
 import { queueEnrichment } from './ingestion/enrichment.js';
 import { registerKnowledge } from './knowledge/index.js';
@@ -34,6 +35,7 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
   await registerIngestion(app,repository);
+  await registerCollectionFocus(app);
   await registerKnowledge(app,repository);
   await registerDocuments(app);await registerEvidence(app);await registerSearch(app);
   await registerOrganization(app);await registerIdentity(app);await registerCleanup(app);
