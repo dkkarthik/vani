@@ -1,3 +1,4 @@
+import { enrichPaper } from './ingestion/enrichment.js';
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { DiscoverySeed } from "@vani/shared";
 import { migrate } from "./cli/migrate.js";
@@ -8,6 +9,7 @@ import {
   collectionMembers,
   configureCollection,
   runDueCollections,
+  reviewMembers,
 } from "./collection-discovery.js";
 
 // Opt-in only: point DATABASE_URL at an isolated disposable PostgreSQL database.
@@ -93,6 +95,10 @@ it.skipIf(!enabled)(
     let members = await collectionMembers(repository, collection.id);
     expect(members.items).toHaveLength(1);
     expect(members.items[0]?.isNew).toBe(true);
+    await enrichPaper(members.items[0]!.id);
+    await reviewMembers(repository,collection.id);
+    members=await collectionMembers(repository,collection.id);
+    expect(members.items[0]?.enrichment?.summary?.text).toContain("Active robotic mapping");
     expect(members.items[0]?.firstPass?.status).toBe("abstract_only");
     const id = members.items[0]!.id;
     await repository.addToCollection(other.id, [id]);

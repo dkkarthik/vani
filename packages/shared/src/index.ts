@@ -62,7 +62,7 @@ export interface FirstPass {
   evidence: Array<{ workId: string; section: string; quote: string }>;
   coverage: string[]; limitations: string[]; provider: string; createdAt: string;
 }
-export type CollectionWork = Work & { isNew: boolean; status: WorkStatus; firstPass?: FirstPass };
+export type CollectionWork = Work & { isNew: boolean; status: WorkStatus; firstPass?: FirstPass; enrichment?: {pdf_status:string;pdf_error:string;status:string;summary?:{status:string;text:string;coverage:string;provider:string;evidence:Array<{quote:string;label:string;page?:number;attachmentId?:string}>;limitations?:string[]}} };
 
 export const Collection = z.object({
   id: z.string(), name: z.string(), description: z.string().default(''),

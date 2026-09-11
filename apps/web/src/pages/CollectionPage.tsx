@@ -1,3 +1,5 @@
+import { AddCollectionPaper } from "../components/AddCollectionPaper";
+import { request } from "../api";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CollectionWork, DiscoverySeed } from "@vani/shared";
@@ -100,6 +102,21 @@ export function CollectionPage() {
       setShowSeed(false);
     },
     onError: () => client.invalidateQueries({ queryKey: ["collections"] }),
+  });
+  const createEmpty = useMutation({
+    mutationFn: () => api.createCollection({ name: name.trim() }),
+    onSuccess: async (c) => {
+      setCollectionId(c.id);
+      setShowCreate(false);
+      setShowSeed(false);
+      await client.invalidateQueries({ queryKey: ["collections"] });
+    },
+  });
+  const enrichmentRetry = useMutation({
+    mutationFn: (id: string) =>
+      request(`/works/${id}/enrichment/retry`, { method: "POST", body: "{}" }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: ["collection-members"] }),
   });
   const refresh = useMutation({
     mutationFn: () => api.refreshCollection(collectionId!),
@@ -207,6 +224,17 @@ export function CollectionPage() {
           </button>
         </section>
       )}
+      {collectionId && active?.collectionType !== "saved_search" && (
+        <AddCollectionPaper
+          key={collectionId}
+          collectionId={collectionId}
+          onSeed={() => {
+            save.reset();
+            setShowSeed(true);
+          }}
+        />
+      )}
+      {enrichmentRetry.error && <ErrorNotice error={enrichmentRetry.error} />}
       {refresh.isSuccess && (
         <p role="status">Search queued; the worker checks every minute.</p>
       )}
@@ -312,10 +340,65 @@ export function CollectionPage() {
                   }}
                 >
                   First pass ·{" "}
-                  {work.firstPass?.status.replaceAll("_", " ") ?? "queued"}
+                  {work.firstPass?.status.replaceAll("_", " ") ?? "not generated"}
                 </button>
-                {work.firstPass && (
-                  <p className="novelty-preview">{work.firstPass.novelty}</p>
+                {work.enrichment && (
+                  <div>
+                    <small>
+                      PDF: {work.enrichment.pdf_status} · Summary:{" "}
+                      {work.enrichment.status}
+                    </small>
+                    {work.enrichment.pdf_error && !work.enrichment.summary && (
+                      <p>{work.enrichment.pdf_error}</p>
+                    )}
+                    {work.enrichment.summary && (
+                      <>
+                        <p className="novelty-preview">
+                          <strong>Primary contribution: </strong>
+                          {work.enrichment.summary.text}
+                        </p>
+                        <small>
+                          {work.enrichment.summary.coverage} ·{" "}
+                          {work.enrichment.summary.status}
+                        </small>
+                        <details>
+                          <summary>
+                            Contribution evidence and processing details
+                          </summary>
+                          {work.enrichment.summary.evidence.map((e, i) => (
+                            <blockquote key={i}>
+                              {e.quote}{" "}
+                              <a
+                                href={`/read/${work.id}${e.page ? `?attachment=${e.attachmentId}&page=${e.page}` : ""}`}
+                              >
+                                {e.label}
+                              </a>
+                            </blockquote>
+                          ))}
+                          {work.enrichment.pdf_error && (
+                            <p>{work.enrichment.pdf_error}</p>
+                          )}
+                          {work.enrichment.summary.limitations?.map((l) => (
+                            <p key={l}>{l}</p>
+                          ))}
+                        </details>
+                      </>
+                    )}
+                    {work.enrichment.status !== "queued" && (
+                      <button
+                        className="first-pass-link"
+                        disabled={enrichmentRetry.isPending}
+                        onClick={() => enrichmentRetry.mutate(work.id)}
+                      >
+                        Retry PDF and summary
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!work.enrichment?.summary && work.firstPass && (
+                  <p className="novelty-preview">
+                    {work.firstPass.contributions}
+                  </p>
                 )}
               </div>
               <span>{work.year ?? "—"}</span>
@@ -371,16 +454,33 @@ export function CollectionPage() {
               />
             </label>
           )}
-          <CollectionSeedForm
-            initial={showCreate ? undefined : active?.discovery}
-            onSave={(seed) => {
-              if (showCreate && !name.trim()) return;
-              save.mutate(seed);
-            }}
-            pending={save.isPending}
-            disabled={showCreate && !name.trim()}
-            error={save.error}
-          />
+          {showCreate ? (
+            <>
+              <p>
+                Create the collection, then upload a PDF, paste a paper link, or
+                configure a topic.
+              </p>
+              {createEmpty.error && <ErrorNotice error={createEmpty.error} />}
+              <button
+                className="button primary"
+                disabled={!name.trim() || createEmpty.isPending}
+                onClick={() => createEmpty.mutate()}
+              >
+                Create collection
+              </button>
+            </>
+          ) : (
+            <CollectionSeedForm
+              initial={showCreate ? undefined : active?.discovery}
+              onSave={(seed) => {
+                if (showCreate && !name.trim()) return;
+                save.mutate(seed);
+              }}
+              pending={save.isPending}
+              disabled={showCreate && !name.trim()}
+              error={save.error}
+            />
+          )}
         </Modal>
       )}
       {report && (

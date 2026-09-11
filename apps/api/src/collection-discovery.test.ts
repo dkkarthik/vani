@@ -1,3 +1,7 @@
+vi.mock("./ingestion/enrichment.js", () => ({
+  queueEnrichment: vi.fn(),
+  runEnrichment: vi.fn(),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DiscoverySeed, Work } from "@vani/shared";
 const mocks = vi.hoisted(() => ({
@@ -15,7 +19,12 @@ vi.mock("./db.js", () => ({
   },
   transaction: async (fn: any) => fn({ query: mocks.query }),
 }));
-vi.mock("./planning/monitor.js",()=>({captureDigest:vi.fn(async()=>({added:0})),feedbackFor:vi.fn(async(items:any[])=>({items})),retainCandidateSource:vi.fn(async()=>{}),refreshWatchedSources:vi.fn(async()=>({warnings:[]}))}));
+vi.mock("./planning/monitor.js", () => ({
+  captureDigest: vi.fn(async () => ({ added: 0 })),
+  feedbackFor: vi.fn(async (items: any[]) => ({ items })),
+  retainCandidateSource: vi.fn(async () => {}),
+  refreshWatchedSources: vi.fn(async () => ({ warnings: [] })),
+}));
 vi.mock("./connectors.js", () => ({ discoverCollection: mocks.discover }));
 vi.mock("./first-pass.js", () => ({
   synthesize: mocks.synthesize,
@@ -129,7 +138,7 @@ describe("living collections", () => {
         { ...seed, mode: "papers", topic: "", workIds: [work.id] },
       ),
     ).rejects.toMatchObject({ statusCode: 422 });
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query.mock.calls.every(([sql])=>String(sql).startsWith("SELECT"))).toBe(true);
   });
   it("acknowledges exact rendered memberships only", async () => {
     await acknowledgeMembers("c", [work.id]);

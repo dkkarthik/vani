@@ -4,8 +4,8 @@ export function FirstPassReport({ report }: { report?: FirstPass }) {
   if (!report)
     return (
       <p>
-        First pass queued. A configured local model or API key is needed for
-        synthesis.
+        No extended first-pass report yet. Contribution summaries appear in the
+        collection; extended first passes run with collection discovery.
       </p>
     );
   return (

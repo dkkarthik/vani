@@ -52,6 +52,8 @@ See [Connected research (F11–F20)](docs/18-connected-research.md) for contextu
 
 See [Research planning (F21–F30)](docs/19-research-planning.md) for persistent maps, reading paths, grounded reports, recommendation feedback and collection change digests.
 
+See [Collection ingestion](docs/20-collection-ingestion.md) to add PDFs or paper links to new or existing collections, refine seed focus, and obtain local PDFs with primary-contribution summaries.
+
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
 ## Product thesis

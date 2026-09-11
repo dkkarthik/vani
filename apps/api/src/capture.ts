@@ -1,3 +1,4 @@
+import { queueEnrichment } from './ingestion/enrichment.js';
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -202,7 +203,9 @@ export class CaptureRepository {
         ],
       );
     });
-    return (await this.get(input.id))!;
+    const saved=(await this.get(input.id))!;
+    await queueEnrichment(saved.workId);
+    return saved;
   }
   async pdf(id: string, bytes: Buffer, filename: string) {
     if (
@@ -255,6 +258,7 @@ export class CaptureRepository {
         [capture.workId],
       );
     });
+    await queueEnrichment(capture.workId,true);
     return (await this.get(id))!;
   }
   async pdfFailed(id: string, message: string) {

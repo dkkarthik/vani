@@ -1,3 +1,5 @@
+import { registerIngestion } from './ingestion/service.js';
+import { queueEnrichment } from './ingestion/enrichment.js';
 import { registerKnowledge } from './knowledge/index.js';
 import { registerDocuments, passage } from './research/documents.js';
 import { registerEvidence } from './research/evidence.js';
@@ -31,6 +33,7 @@ const workInput = z.object({ title: z.string().min(1), abstract: z.string().opti
 
 export async function registerRoutes(app: FastifyInstance, repository: Repository) {
   const objects = new ObjectStore();
+  await registerIngestion(app,repository);
   await registerKnowledge(app,repository);
   await registerDocuments(app);await registerEvidence(app);await registerSearch(app);
   await registerOrganization(app);await registerIdentity(app);await registerCleanup(app);
@@ -104,7 +107,7 @@ export async function registerRoutes(app: FastifyInstance, repository: Repositor
   });
   app.post('/api/v1/discover/import', async (request, reply) => {
     const input = workInput.extend({ connector: z.string(), externalId: z.string(), sourcePayload: z.unknown() }).parse(request.body);
-    return reply.code(201).send(await repository.createWork(input));
+    const work=await repository.createWork(input);await queueEnrichment(work.id);return reply.code(201).send(work);
   });
 
   app.post('/api/v1/graph/neighborhood', async (request) => {

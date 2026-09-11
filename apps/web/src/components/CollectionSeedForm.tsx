@@ -64,8 +64,9 @@ export function CollectionSeedForm({
         <>
           <p>
             Select up to 10 papers. VANI will synthesize a moderately narrow
-            topic from their titles and abstracts. Use Discover to find and
-            import papers by title or DOI first.
+            topic from their titles and abstracts. Add PDFs or paper links
+            directly from the collection. Uploaded seed papers also contribute
+            local text excerpts.
           </p>
           <label>
             Find seed papers
@@ -121,6 +122,15 @@ export function CollectionSeedForm({
           }
         />
       </label>
+      {mode === "papers" && (
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => setTopic("")}
+        >
+          Infer a revised focus from all selected seeds
+        </button>
+      )}
       <label>
         Morning search hour
         <select
@@ -153,7 +163,7 @@ export function CollectionSeedForm({
       </label>
       <small>
         Searches run while the API server is running, with catch-up after
-        downtime. Public metadata uses your configured model; uploaded PDFs stay
+        downtime. Seed focus synthesis uses your local model; uploaded PDFs stay
         local.
       </small>
       {error && <ErrorNotice error={error} />}

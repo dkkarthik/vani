@@ -1,4 +1,10 @@
-import { captureDigest,feedbackFor,retainCandidateSource,refreshWatchedSources } from './planning/monitor.js';
+import { queueEnrichment, runEnrichment } from "./ingestion/enrichment.js";
+import {
+  captureDigest,
+  feedbackFor,
+  retainCandidateSource,
+  refreshWatchedSources,
+} from "./planning/monitor.js";
 import { z } from "zod";
 import { DiscoverySeed, type CollectionWork, type Work } from "@vani/shared";
 import { pool, query, transaction } from "./db.js";
@@ -50,14 +56,25 @@ export async function configureCollection(
       try {
         const result = await synthesize(
           "Infer ONE moderately narrow, coherent research topic shared by these seed papers. Specify the problem, method or setting, not a broad discipline. Return JSON {topic:string}. Do not fabricate a common theme for unrelated papers; return an empty topic if there is none.",
-          works.map((work) => ({
-            title: work!.title,
-            abstract: work!.abstract,
-          })),
-          z.object({ topic: z.string().trim().min(2).max(500) }),
-          works.some((work) =>
-            ["user_uploaded", "private"].includes(work!.accessClass),
+          await Promise.all(
+            works.map(async (work) => ({
+              title: work!.title,
+              abstract: work!.abstract,
+              localExcerpt:
+                (
+                  await query<any>(
+                    `SELECT d.pages FROM attachment a JOIN document_index d ON d.object_hash=a.object_hash WHERE canonical_work(a.work_id)=$1 ORDER BY a.created_at DESC LIMIT 1`,
+                    [work!.id],
+                  )
+                ).rows[0]?.pages
+                  ?.slice(0, 3)
+                  .map((p: any) => p.text)
+                  .join("\n")
+                  .slice(0, 12000) ?? "",
+            })),
           ),
+          z.object({ topic: z.string().trim().min(2).max(500) }),
+          true,
         );
         seed = { ...seed, topic: result.value.topic };
       } catch {
@@ -99,7 +116,8 @@ export async function collectionMembers(
     if (page.length < 500) break;
   }
   const metadata = await query<any>(
-    `SELECT cm.work_id,cm.seen_at,cm.status,fp.report FROM collection_membership cm
+    `SELECT cm.work_id,cm.seen_at,cm.status,fp.report,to_jsonb(pe) enrichment FROM collection_membership cm
+    LEFT JOIN paper_enrichment pe ON pe.work_id=canonical_work(cm.work_id)
     LEFT JOIN paper_first_pass fp ON fp.collection_id=cm.collection_id AND fp.work_id=cm.work_id WHERE cm.collection_id=$1`,
     [id],
   );
@@ -111,6 +129,7 @@ export async function collectionMembers(
         isNew: !row?.seen_at,
         status: row?.status ?? "inbox",
         firstPass: row?.report,
+        enrichment: row?.enrichment,
       };
     }),
   };
@@ -129,6 +148,7 @@ export async function reviewMembers(repository: Repository, id: string) {
   for (const work of items) {
     if (
       work.recordKind === "demo_fixture" ||
+      work.enrichment?.status === "queued" ||
       (work.firstPass &&
         !["needs_evidence", "needs_model"].includes(work.firstPass.status))
     )
@@ -200,15 +220,19 @@ export async function runDueCollections(repository: Repository) {
           config.openAlexEmail,
           since,
         );
-        const filtered=await feedbackFor(result.items,'collection:'+row.id);
+        const filtered = await feedbackFor(
+          result.items,
+          "collection:" + row.id,
+        );
         for (const candidate of filtered.items) {
           if (relevance(seed.topic, candidate.title, candidate.abstract) < 0.35)
             continue;
           const work = await repository.createWork(candidate);
-          await retainCandidateSource(work.id,candidate);
+          await retainCandidateSource(work.id, candidate);
           await repository.addToCollection(row.id, [work.id]);
+          await queueEnrichment(work.id);
         }
-        const sourceChecks=await refreshWatchedSources(row.id);
+        const sourceChecks = await refreshWatchedSources(row.id);
         result.warnings.push(...sourceChecks.warnings);
         await captureDigest(row.id);
         await reviewMembers(repository, row.id);
@@ -243,6 +267,7 @@ export function startDiscoveryWorker(
     if (running) return;
     running = true;
     try {
+      await runEnrichment();
       await runDueCollections(repository);
     } catch (error) {
       onError(error);

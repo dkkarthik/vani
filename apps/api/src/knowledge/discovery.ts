@@ -1,3 +1,4 @@
+import { queueEnrichment } from '../ingestion/enrichment.js';
 import { feedbackFor,feedbackContext } from '../planning/monitor.js';
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -331,6 +332,7 @@ export async function registerDiscovery(
             .digest("hex"),
         ],
       );
+      await queueEnrichment(work!.id);
       items.push({ resultId: c.resultId, work });
       if (d.collectionId)
         await repository.addToCollection(d.collectionId, [work!.id]);

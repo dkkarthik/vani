@@ -23,7 +23,8 @@
     "research:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/research-smoke.mjs",
     "workspace:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/workspace-smoke.mjs",
     "connected:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/connected-smoke.mjs",
-    "planning:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/planning-smoke.mjs"
+    "planning:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/planning-smoke.mjs",
+    "ingestion:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/ingestion-smoke.mjs"
   },
   "engines": {
     "node": ">=22"
