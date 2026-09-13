@@ -193,3 +193,7 @@ Deliver a shared task-aware router, migrate synthesis and legacy chat plus all b
 ## 12. Planned local collection conversations
 
 **F44 — Local-model collection conversations** is a planned P1 feature within the local-model deployment. See the [specification](../design/F44-local-model-collection-conversations.md). Build on LM-R01 and F26: migrate legacy collection chat, preserve scoped follow-up context and evidence citations, retain history/provenance, and show local-model recovery states. Collection conversation tasks remain local-only even if other jobs permit cloud escalation. Installer/model availability alone does not complete this feature.
+
+## 13. Core algorithm learning audits
+
+**CA35 — Periodic learning audits** is a planned core-algorithm feature. See the [specification](../design/core-learning-audits.md). Expand the initial D0/D1 ceilings to 20,000/2,000 while retaining selective 40/10 D2/D3 ceilings. Audit the full early-stage pool every three days and all deep-stage records monthly during low workload. Deliver complete coverage accounting, selective stronger-model judgments, independent controls/probes, source-backed learning examples, held-out policy evaluation, shadow promotion and rollback. Start with reports before enabling bounded automatic adaptation; all audit execution uses LM-R01 and shared resource budgets.

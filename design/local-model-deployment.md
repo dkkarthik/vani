@@ -123,7 +123,13 @@ Persist the following for querying and audit:
 
 Answer “Why was this included?”, “What changed after I removed that keyword?” and “Which closest papers remain uncertain?” from these records locally. Materialized summaries accelerate retrieval but must link to original evidence; repeated model summaries are not independent corroboration.
 
-Retain the core algorithm's illustrative refresh caps of 2,000 D0 candidates, 200 D1 assessments, 40 D2 readings and 10 D3 dossiers. These are maxima, not a requirement to fill every tier. A refresh with no changes should make **zero generative calls**, local or cloud. Brief summaries required for newly accepted papers count toward the local work budget; excess jobs queue rather than disappear.
+Retain the core algorithm's illustrative refresh caps of 20,000 D0 candidates, 2,000 D1 assessments, 40 D2 readings and 10 D3 dossiers. These are maxima, not a requirement to fill every tier. A refresh with no changes should make **zero generative calls**, local or cloud. Brief summaries required for newly accepted papers count toward the local work budget; excess jobs queue rather than disappear.
+
+### Periodic learning audits (CA35)
+
+The [core learning-audit feature](core-learning-audits.md) checks every retained D0/D1 record every three days and every retained D2/D3 record monthly. Full-pool lightweight checks are combined with selective stronger local reasoning, controls from rejected/unadvanced papers and independent discovery probes. Its task profiles, idle-window scheduling, separate audit allowances, source validation and gated policy promotion must be implemented through LM-R01 and the shared queue. Optional cloud audit judgments remain subject to the existing privacy and installation-wide budget gates; default cloud mode stays off. F44 chat remains local-only.
+
+The expanded discovery ceilings are ten times the earlier proposal; they require queueing and workstation measurement, not concurrent loading of more models. Routine unchanged refreshes make zero generative calls; a due audit may deliberately re-evaluate unchanged evidence within its separately reported budget. Audit results update versioned retrieval/ranking policies and prompts only after held-out validation and shadow evaluation.
 
 ## 7. What the current repository supports, and what must change
 

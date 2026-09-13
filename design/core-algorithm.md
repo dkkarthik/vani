@@ -157,6 +157,7 @@ The following features define the proposed product and algorithm. **P0** is requ
 | CA32 / P1     | **Coverage and diversity.** Facet coverage, independent groups, competing mechanisms and bridge papers.                         | Diversify an eligible reading set without mislabeling distant papers as close or suppressing an actual nearest neighbor.                               |
 | CA33 / P0     | **Incremental reassessment.** Dependency hashes, source versions, run manifests and invalidation.                               | Recompute only changed material; never overwrite the historical reason for admission with a new explanation.                                           |
 | CA34 / P0     | **Evaluation and audit.** Frozen benchmark collections, budgets, ablations and source-grounding checks.                         | Demonstrate improvement over keyword matching before changing automatic admission.                                                                     |
+| CA35 / P1 | **Periodic learning audits.** Full-pool D0/D1 audit every three days and D2/D3 audit monthly; source-backed judgments, held-out policy evaluation and versioned adaptation. | Improve retrieval and reading policies during idle periods, with controls for missed candidates, feedback loops and rollback. See the [learning-audit specification](core-learning-audits.md). |
 
 ## 5. Proposed retrieval and ranking algorithm
 
@@ -246,13 +247,19 @@ Deep analysis must not be the prerequisite for deciding which papers merit targe
 
 ### Example budgets to validate
 
-For an initial manual refresh, test a starting budget of up to 2,000 deduplicated D0 candidates, 200 D1 assessments, 40 D2 reads and 10 new D3 dossiers. These are ceilings, not targets: a collection with three close works should not force seven distant papers into D3. Focal-paper analysis has a separate one-time budget and is reused across refreshes.
+For an initial manual refresh, test a starting budget of up to 20,000 deduplicated D0 candidates, 2,000 D1 assessments, 40 D2 reads and 10 new D3 dossiers. These are ceilings, not targets: a collection with three close works should not force seven distant papers into D3. Focal-paper analysis has a separate one-time budget and is reused across refreshes.
 
 For daily updates, process changed/new records and revisit unresolved high-value candidates within a shared daily budget. Do not reset the full D3 allowance independently for every click or every collection. Deduplicate overlapping requests and reuse a paper's parsing and factual extraction across collections; only collection-specific comparisons need separate evaluation.
 
 Schedule the next action by estimated decision value per cost: likely effect on the closest-work list or an unresolved question, multiplied by probability the action resolves the gap, divided by estimated inference/IO cost. Early versions can implement this with transparent priorities and measured costs instead of pretending to know an exact expected-value model.
 
 Enforce limits on API requests, downloads, bytes, tokens, runtime and concurrent jobs. Save checkpoints; stop or defer when the budget is exhausted. A run result reports candidates screened, tier changes, deep reads, coverage gaps and budget used—not just papers downloaded. Support explicit continuation from the frontier rather than restarting the same search.
+
+### Continuous learning and idle-time audits
+
+**CA35** adds an audit of every retained D0/D1 record every three days and every retained D2/D3 record each calendar month. The [detailed specification](core-learning-audits.md) defines full-corpus coverage, selective stronger-model rejudgment, independent discovery probes, provisional versus confirmed labels, bounded policy changes, held-out evaluation, shadow promotion and rollback. The final related/closest set supplies a comparison target, not unquestioned ground truth. Audit the rejected and unadvanced population as well as successful promotions.
+
+Run audits through the installation queue during low workload, using separate audit budgets under shared resource/cloud limits. Reuse existing evidence, checkpoint unfinished work and yield to interactive use. Initially adapt collection-specific retrieval/ranking parameters and validated prompts; model-weight fine-tuning is deferred. Preserve all original decisions and explicit research focus.
 
 ### Preserve the local-PDF requirement without reading everything deeply
 
@@ -361,7 +368,8 @@ The most damaging failure is a self-reinforcing loop: a weak candidate is accept
 3. **Targeted citation and comparison reading.** Extract contexts from focal works first, because one focal analysis can prioritize many references. Add baseline linking, citation intent, D2 evidence and an analysis scheduler. A researcher can already request a D3 read explicitly.
 4. **Selective automatic deep analysis.** Enable automatic D3 only after tier calibration and grounding tests meet release gates. Produce contribution-level dossiers for the closest supported works; reuse factual analysis across collections.
 5. **Queryable memory and incremental updates.** Connect assessments, typed relationships and passages to Ask VANI, with current/historical scopes, dependency invalidation and saved query evidence.
-6. **Experiments.** Evaluate intent-aware diffusion, node-split graphs, learned ranking and methodological-inspiration retrieval. Adopt a more complex model only if it improves relevance at an acceptable cost.
+6. **Periodic learning (CA35).** Add the three-day early-stage and monthly deep-stage audits, initially as reports and shadow proposals. Enable automatic bounded adaptation only after the learning-audit evaluation and scheduling gates pass.
+7. **Experiments.** Evaluate intent-aware diffusion, node-split graphs, learned ranking and methodological-inspiration retrieval. Adopt a more complex model only if it improves relevance at an acceptable cost.
 
 Use a collection-level algorithm version and a shadow mode that compares old/new outputs without altering saved membership. Preview reclassification of existing papers; keep their files and annotations. Explicitly accepted papers remain saved even if the new model calls them background. Automated decisions apply only to the collection snapshot under which they were computed; changed focus or evidence requires reassessment before admission.
 
