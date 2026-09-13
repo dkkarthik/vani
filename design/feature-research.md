@@ -85,7 +85,7 @@ A useful usability lesson is that requests sometimes receive replies explaining 
 
 ## Desired feature catalog
 
-These 42 feature packages describe the desired product. **P0** means a foundational requirement or minimum useful research workflow; **P1** means a recommended next capability; **P2** means a later audience expansion or specialized workflow. These labels do not override the existing frozen release scope. Each row links to supporting demand or a relevant product/workflow precedent; a precedent is not a popularity measurement.
+The original research identified F01–F42; F43 was added at the owner's request on September 13, 2026. These 43 feature packages describe the desired product. **P0** means a foundational requirement or minimum useful research workflow; **P1** means a recommended next capability; **P2** means a later audience expansion or specialized workflow. These labels do not override the existing frozen release scope. Each research row links to supporting demand or a relevant product/workflow precedent; a precedent is not a popularity measurement.
 
 ### Collect and maintain the library
 
@@ -163,6 +163,12 @@ These 42 feature packages describe the desired product. **P0** means a foundatio
 | F40 | P2       | Team knowledge spaces            | Shared collections and boards, roles, attribution, comments, private notes, and conflict resolution.                                                            | [Citavi collaboration][p9], [Heptabase][p18]                |
 | F41 | P2       | Systematic-review workflow       | Screening decisions and reasons, reviewer conflict resolution, extraction forms, search history, corpus snapshots, and review reporting/export.                 | [Elicit][p19], [ReadCube][p7]                               |
 | F42 | P2       | Stable extension interface       | A documented API/CLI for import, retrieval, annotation, and export, with explicit permissions and version compatibility.                                        | [Annotation API request][u12], [annotation-link plugin][e2] |
+
+### Installation and workstation readiness
+
+| ID | Priority | Desired feature | Concrete expected behavior | Basis |
+| --- | --- | --- | --- | --- |
+| F43 | P1 | [Ubuntu dependency checker and installer](F43-ubuntu-dependency-checker-and-installer.md) | Inspect dependencies without changes; install missing Ubuntu packages and local models; preserve existing libraries/configuration; resume failures and verify app, PDF, database and GPU readiness. Planned, not implemented. | Owner request, September 13, 2026; [local deployment plan](local-model-deployment.md). |
 
 ## What a useful knowledge graph should mean
 

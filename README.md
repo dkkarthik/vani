@@ -64,6 +64,8 @@ See [Core algorithm proposal](design/core-algorithm.md) for the literature revie
 
 See [Local model deployment plan](design/local-model-deployment.md) for the RTX 5090 model recommendation, local execution by analysis tier, cloud spending controls, and deployment and evaluation steps.
 
+See [Ubuntu dependency checker and installer (F43)](design/F43-ubuntu-dependency-checker-and-installer.md) for the planned setup feature, dependency checks, install workflow and acceptance criteria. The installer is not implemented yet.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:

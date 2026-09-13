@@ -178,3 +178,8 @@ Build vertical slices with deployable outcomes. Each milestone includes migratio
 - multi-node deployment and MinIO;
 - native mobile clients.
 
+## 10. Planned workstation setup feature
+
+**F43 — Ubuntu dependency checker and installer** is a separate planned P1 feature, added September 13, 2026. See the [design specification](../design/F43-ubuntu-dependency-checker-and-installer.md) for Ubuntu support, dependency inventory, check/dry-run/install commands, local-model profiles, recovery behavior and acceptance tests.
+
+Build in order: shared diagnostics and manifest → resumable Ubuntu installation/configuration → app/database/local-model verification → System health UI and workstation acceptance. This supplies a concrete follow-up to installer/container packaging in Milestone 5. No installer implementation is included in the planning change.
