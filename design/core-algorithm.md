@@ -10,6 +10,8 @@ Keep five quantities distinct: **proximity to the current work, relationship typ
 
 Status: proposed research-backed design, not an implemented replacement. Literature coverage extends through September 13, 2026. All weights, budgets, thresholds, priorities and acceptance targets below are VANI design proposals to validate, not constants established by the cited literature.
 
+The companion [local model deployment plan](local-model-deployment.md) maps these stages to a Linux workstation with an RTX 5090 and 64 GB RAM, recommends local models, and specifies when cloud escalation is justified.
+
 ## 1. What must change in VANI
 
 The present implementation has useful infrastructure but an inadequate decision rule:

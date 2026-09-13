@@ -62,6 +62,8 @@ See [Feature research](design/feature-research.md) for the competitive landscape
 
 See [Core algorithm proposal](design/core-algorithm.md) for the literature review and desired features for idea proximity, selective deep reading, and queryable collection reasoning.
 
+See [Local model deployment plan](design/local-model-deployment.md) for the RTX 5090 model recommendation, local execution by analysis tier, cloud spending controls, and deployment and evaluation steps.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:
