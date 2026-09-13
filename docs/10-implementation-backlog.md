@@ -183,3 +183,9 @@ Build vertical slices with deployable outcomes. Each milestone includes migratio
 **F43 — Ubuntu dependency checker and installer** is a separate planned P1 feature, added September 13, 2026. See the [design specification](../design/F43-ubuntu-dependency-checker-and-installer.md) for Ubuntu support, dependency inventory, check/dry-run/install commands, local-model profiles, recovery behavior and acceptance tests.
 
 Build in order: shared diagnostics and manifest → resumable Ubuntu installation/configuration → app/database/local-model verification → System health UI and workstation acceptance. This supplies a concrete follow-up to installer/container packaging in Milestone 5. No installer implementation is included in the planning change.
+
+## 11. Required local-model routing workstream
+
+**LM-R01 — Shared local-first model router** is a required implementation workstream within the [local-model feature plan](../design/local-model-deployment.md#71-required-implementation-workstream-lm-r01--shared-local-first-model-router), not a completed capability. Implement it before enabling cloud credentials in that deployment.
+
+Deliver a shared task-aware router, migrate synthesis and legacy chat plus all background callers, default to local-first with cloud disabled, and persist provider decisions and usage. Add evidence/privacy enforcement and explicit approval or budgeted cloud escalation after the local-only enforcement tests pass. F43 installs dependencies and reports effective routing; it does not substitute for this application change. Acceptance includes zero cloud requests with cloud disabled even when credentials exist, local generative chat, no failure-driven cloud fallback, and tested approval/budget handling.

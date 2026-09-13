@@ -83,6 +83,8 @@ Use native API/web services and native Ollama with Docker PostgreSQL, as in the 
 
 The current code selects cloud synthesis whenever a cloud key is configured. Until the shared provider router exists, the installer-generated local launcher must explicitly provide an empty effective `OPENAI_API_KEY`. The legacy chat path must be reported accurately: installing Ollama alone does not give that path local generative synthesis.
 
+The required application dependency is **LM-R01 — Shared local-first model router**, specified in the [local-model feature plan](local-model-deployment.md#71-required-implementation-workstream-lm-r01--shared-local-first-model-router). After it is implemented, diagnostics must verify its effective policy and report whether cloud dispatch is allowed; a configured key alone does not imply cloud use.
+
 ## Recovery, diagnostics and product integration
 
 Store a redacted installation report with setup version, manifest version, repository revision, detected versions/digests, completed actions and remaining issues in a user-owned configuration/state directory outside Git. Retain managed-file backups and a resume journal. Always recheck actual machine state on resume; journal completion is not proof a dependency still works.

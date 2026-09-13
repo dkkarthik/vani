@@ -140,6 +140,53 @@ Until the router is implemented, **keep `OPENAI_API_KEY` empty in the VANI proce
 
 Suggested future settings include `VANI_MODEL_POLICY=local_only|local_first`, `VANI_CLOUD_MODE=off|ask|budgeted`, stage budgets and global/collection spending limits. These names are **proposed, not accepted configuration today**. Test that setting a key while cloud mode is off cannot cause a request from any API path or background job.
 
+### 7.1 Required implementation workstream: LM-R01 — Shared local-first model router
+
+**Status: planned; required for the local-model feature.** Implement the router before enabling cloud credentials in the new local-first deployment. This is an application change, not an installer setting. Its first deliverable replaces key-driven routing in both synthesis and legacy chat; advanced D0–D3 scheduling can build on it later.
+
+The router is the sole application entry point for generative inference. Callers describe the task and evidence; they cannot select a cloud endpoint or bypass policy with a provider flag. Keep provider HTTP clients behind the router. Embedding and reranking adapters remain explicitly local and share resource scheduling without acquiring implicit cloud fallbacks.
+
+**Request contract:** task ID/type, optional analysis depth, collection/focal-work IDs, versioned evidence references, prompt/schema versions, output schema, token/deadline limits, cancellation signal and idempotency key. The router resolves authoritative privacy classifications and current collection policy itself. Unknown classification is ineligible for cloud; a caller-supplied `privateEvidence=false` must not override stored source restrictions. Tasks without a collection still receive installation-level policy and budget enforcement.
+
+**Result contract:** validated output or a typed unresolved state, model/provider provenance, evidence references, usage, attempt IDs and a concise routing reason. Distinguish `complete`, `queued_local`, `insufficient_evidence`, `awaiting_cloud_approval`, `budget_exhausted`, `local_unavailable` and `validation_failed`. An extractive fallback must identify itself and retain its limitations; it is not a successful deep comparison.
+
+#### Routing rules
+
+| Situation                                                          | Required decision                                                                                                                                               |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Default configuration                                              | `local_first` with cloud mode `off`; use the configured local model even when a cloud key exists.                                                               |
+| Explicit `local_only` policy                                       | Never dispatch cloud requests. Reject a conflicting non-off cloud mode during configuration validation.                                                         |
+| Valid compatible cached result                                     | Reuse it with original provenance; make no provider request. Recheck evidence scope and policy compatibility before reuse.                                      |
+| New synthesis or chat request                                      | Check available evidence, choose the local task profile, queue within GPU limits, execute and validate locally.                                                 |
+| Local result passes validation                                     | Return and persist it; no automatic cloud second opinion.                                                                                                       |
+| Local evidence comparison remains materially unresolved            | Apply every escalation gate in section 5, including task eligibility, privacy, local attempt history and available budget. D1 remains local-only.               |
+| Eligible escalation in `ask` mode                                  | Save a preview of the exact outbound packet, question and token ceiling. Wait for explicit approval of that packet; a changed packet requires renewed approval. |
+| Eligible escalation in `budgeted` mode                             | Reserve budget transactionally, recheck effective policy immediately before dispatch, then invoke the approved cloud adapter.                                   |
+| Timeout, overload, missing model, cancellation or malformed output | Queue, perform a bounded local repair, or return the appropriate unresolved state. Infrastructure errors never authorize cloud use.                             |
+| Missing/invalid policy or missing cloud credential                 | Fail closed for cloud. Report the configuration problem without changing the effective provider implicitly.                                                     |
+
+Keep routing deterministic and inspectable; do not spend another model call deciding which model to use. Store the decision and local validation outcome independently of generated deliberation. Approval and budget checks apply again after a queued job resumes, so a policy change or revoked approval prevents an undispatched cloud request. Preserve reservations for uncertain paid outcomes until reconciled rather than retrying blindly.
+
+#### Code migration and deliverables
+
+1. Add a shared router, task-profile registry and local/cloud provider adapters under the API, with validated configuration and the contracts above. Local model health checks include endpoint locality and model identity; a hosted Ollama model must not be labeled local merely because its proxy URL is loopback.
+2. Replace direct provider selection in `first-pass.ts` and direct cloud calls in `ask.ts`. Update collection focus synthesis in `collection-discovery.ts`, contribution summaries in `ingestion/enrichment.ts`, and reports in `planning/insights.ts` to provide explicit task/evidence metadata. Audit all provider request sites so interactive and background work follow the same policy.
+3. Add durable model-run/routing records, cache integration and typed failure handling. Surface effective provider, concise reason and unresolved state in responses and collection history. Do not log credentials or unrestricted source payloads.
+4. Add explicit cloud approval and budgeted dispatch using section 5's limits. Keep both disabled until their persistence, privacy and budget tests pass. Provide a settings control that can disable future cloud dispatch immediately without removing stored credentials.
+5. Update environment examples, Compose forwarding, native configuration loading and the F43 diagnostics contract. Existing installations with a key must migrate to local-first/cloud-off defaults; absent Ollama produces an actionable local-unavailable result rather than preserving cloud-first behavior.
+
+#### Router acceptance gates
+
+- With local inference healthy and a cloud key configured, synthesis, legacy chat, contribution summaries and background collection jobs all select local inference.
+- With cloud disabled or `local_only`, provider spies observe zero cloud calls across success, timeout, unavailable model, invalid JSON, retry and restart cases.
+- Local chat invokes Ollama rather than falling directly to the current abstract-only extractive path; unsupported answers still return explicit evidence limitations.
+- Unknown/private evidence and private derivatives cannot leave through any caller, including a packet combining public papers with a private focal question.
+- An eligible approved/budgeted escalation sends exactly the permitted evidence packet once; changed evidence, revoked policy, budget races and uncertain paid outcomes prevent unintended dispatch or duplicate spending.
+- Every accepted result passes schema and evidence checks; each attempt exposes a durable provider choice and routing reason. A cloud response receives the same validation as a local response.
+- Tests enforce that provider HTTP clients are invoked only through the router, including future request paths. No-key and existing-key upgrades both produce the documented local-first behavior.
+
+This workstream is complete only after the migrated paths and enforcement tests pass. Documentation or installer environment variables alone do not satisfy LM-R01.
+
 ## 8. Deployment on the school desktop
 
 Use native Linux Ollama and native VANI Node processes initially, with PostgreSQL in Docker. This matches the API's existing loopback integration and avoids container-to-host inference networking. For long-running use, supervise the built API and web server with restart policies and run the queue after boot. Expose the UI through an authenticated connection if remote access is needed; keep the inference endpoint local.
@@ -232,7 +279,7 @@ The call-share target excludes embeddings and reranking so cheap local operation
 
 Implement in this order:
 
-1. **Local runtime and enforceable policy.** Introduce the shared provider/router, update synthesis and legacy chat, add output/context limits and diagnostics. Deliver a local-only deployment that cannot spend cloud tokens even with a key configured.
+1. **Local runtime and enforceable policy (LM-R01).** Implement the shared router specified in section 7.1, migrate synthesis and legacy chat, and add output/context limits and diagnostics. First ship its local-first/cloud-off behavior with enforcement tests; add its approval/budgeted dispatch in step 4. Deliver a deployment that cannot spend cloud tokens while cloud mode is off, even with a key configured.
 2. **Incremental retrieval and reading.** Implement the relevant core-algorithm D0/D1 components, paper/passage representations, artifact caches and dependency invalidation. Add the reranker and single-GPU scheduler; stop rerunning unchanged papers.
 3. **Selective depth and queryable evidence.** Add D2/D3 evidence packets, contribution/relationship schemas, local validation and durable collection assessments. Enable local questions over those records.
 4. **Controlled escalation.** Add packet inspection, privacy checks, durable token/budget reservations, explicit routing reasons and cloud-off/ask/budgeted UI modes. Keep automatic mode off until evaluation and budget configuration are complete.
