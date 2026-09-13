@@ -12,6 +12,8 @@ Status: proposed research-backed design, not an implemented replacement. Literat
 
 The companion [local model deployment plan](local-model-deployment.md) maps these stages to a Linux workstation with an RTX 5090 and 64 GB RAM, recommends local models, and specifies when cloud escalation is justified.
 
+The [critical design review](core-algorithm-review.md) compares this proposal with documented tools, the earlier literature and research workflows in computer vision, robotics, machine learning and embodied AI. Section 13 records its proposed amendments; these have not been implemented or silently substituted for the existing stage contracts.
+
 ## 1. What must change in VANI
 
 The present implementation has useful infrastructure but an inadequate decision rule:
@@ -430,6 +432,52 @@ Targets are provisional product requirements. If they are not met, keep suggeste
 Deliver the focus model, candidate staging, scientific semantic retrieval, normalized citation neighborhoods, per-layer personalized PageRank, basic evidence-backed comparisons and a strict depth budget together. Those components address both bad admission and indiscriminate processing.
 
 Then add baseline/context extraction and collection memory queries. Keep advanced graph learning and cross-domain inspiration behind measured experiments. The enduring asset should be the versioned comparison evidence attached to the collection; an embedding model, graph implementation or LLM can then be replaced without losing what the researcher has learned.
+
+## 13. Proposed amendments from the comparative design review
+
+The [review and source corpus](core-algorithm-review.md) recommends the following refinements to existing features. These are recommendations for the next specification/implementation pass. In particular, the D1 split and priority changes below are proposed changes to the preceding design, not descriptions of current behavior. Preserve the agreed 20,000 D0 / 2,000 D1 / 40 D2 / 10 D3 ceilings, local execution policies, three-day early audits and calendar-month deep audits.
+
+### R1: Make domain assumptions and experimental comparability first-delivery requirements
+
+Promote the minimum CA05/CA06 schemas to P0, with detailed extraction still performed selectively at D2. Extend CA01–CA06, CA14 and CA29 with a versioned CV/ML/robotics profile. Include task and success criteria; dataset/version/split; pretraining and adaptation data; embodiment; observation and action spaces; control rate and horizon; sim/real setting; intervention/reset policy; generalization axis; trial counts and uncertainty; and code/checkpoint provenance. Unknown and not applicable remain valid values.
+
+For CV/ML comparisons, include output granularity, input resolution, supervision, external training data, evaluation regime (such as linear probe, fine-tuning or zero-shot) and inference budget. Select only fields material to the comparison; absent data is not evidence of a mismatch or contamination.
+
+Store experiment-level `comparison_status` (`compatible`, `qualified`, `incompatible`, `unknown`) relative to a named comparison question and protocol revision. Keep it separate from conceptual proximity. Two papers can be close while an unqualified performance ordering is unsupported. Require evidence for the dimensions material to that ordering; sharing a benchmark name is insufficient.
+
+### R2: Add attributable discovery sources and artifact lineage
+
+Extend CA09, CA15, CA21, CA23–CA25 and CA33. Promote minimum artifact identity and provenance in CA21 to P0. Represent paper/version, repository/release, dataset, checkpoint, project page and curated article separately, with typed `describes`, `implements`, `trained_on`, `evaluated_on`, `extends` and `discovered_via` links. Save source dates, identifiers and hashes; changes invalidate dependent comparisons.
+
+An article or lab post can supply a bibliography, terminology or a proposed taxonomy. Those are discovery leads or attributed interpretations, not automatic primary evidence of closeness. Track evidentiary origin separately from document identity: a paper, blog and repository describing one experiment are not independent replications. Preserve substantive new results in extensions rather than merging all versions indiscriminately.
+
+Distinguish `expansion_eligible` from membership and focal-seed status. A supported assessment can authorize bounded reference/citer expansion without altering the collection's focus or persistent PPR restart weights. Record the expansion path and apply the same candidate gates to every discovered work.
+
+### R3: Report search coverage and unfinished frontiers
+
+Extend CA08–CA12, CA24, CA26, CA32 and CA33 with a source/query/facet coverage ledger. Persist exact provider queries, filters, dates, cursors, returned identifiers, truncation, missing metadata, source failures and marginal discoveries. Do not invent totals for providers that do not expose them. Record publication, first-seen, revision and retrieval times independently.
+
+Distinguish exhausted frontiers, budget pauses and unavailable sources. Source failure cannot support “no new related papers.” Low yield can guide scheduling but does not prove completeness. A historical replay needs contemporaneous evidence; otherwise identify its approximation. Preserve independent probes, recent-paper routes and the ability to resume work without resetting allowances.
+
+### R4: Split D1 screening from selective generation
+
+Extend CA27–CA28 and LM-R01 with proposed internal D1 steps: D1a uses local reranking, cached features and optional lightweight feedback learning; D1b performs compact generative extraction for promising, uncertain or exploration-selected candidates. Keep the capacity for 2,000 unique D1 candidates and account for generative D1b calls separately. Do not present a D1a score as a model-written comparison or fabricate facets that were never extracted.
+
+Benchmark the split against generative D1 at equal recall and cost on the workstation. Preserve exploration, provisional/unknown states and source-backed explanations. Keep a `needs_evidence` backlog beyond the 40 D2 and 10 D3 reading ceilings; budget exhaustion is not a negative relevance judgment. Accepted papers still require the existing local-PDF acquisition and contribution-summary workflow. Cloud access remains controlled by the router, and F44 stays local-only.
+
+### R5: Strengthen the evaluation of continuous learning
+
+Extend CA31/CA34/CA35 using [review recommendation R5](core-algorithm-review.md#r5--learning-audits-that-can-falsify-their-own-assumptions). Keep every-record audit coverage, while reporting fresh semantic rejudgments, reused evidence and metadata-only checks separately. Preserve label provenance and distinguish wrong-topic/role/protocol feedback from already-known or low-reading-priority feedback. The final admitted set and a stronger model's agreement are not independent ground truth.
+
+Separate tuning data, diagnostic challenge sets and protected promotion evaluations. Log holdout exposure and use prospective cohorts plus a predeclared repeated-testing policy. Once detailed failures inform tuning, the dataset is no longer an untouched holdout. The existing 50-pair/10-closest floor does not establish statistical power. Insufficient evidence keeps proposals in report/shadow mode; it does not relax the promotion gates. Retain sampling probabilities for controls and qualify population estimates when judgments or coverage are inadequate.
+
+### R6: Evaluate the complete research decision
+
+Extend CA29–CA30 and CA34. Add a small domain pilot before the broader benchmark; use it to refine schemas and find failures, not to certify generality. Include protocol mismatches, artifact/version families, uncited close works and non-relevance feedback. Compare the local embedding choice with scientific retrieval representations and lexical baselines, and add TF–IDF/SVM or embedding/linear feedback baselines before complex learning.
+
+Report conditional stage recall and cumulative recovery through the final supported assessment, separately from D3 dossier coverage. Measure discovery, proximity/role/comparability judgments and memory answers independently. Three gates with 90% conditional recall retain only 72.9% overall; D0 recall alone cannot certify the full pipeline. Historical evaluation must also disclose potential model-pretraining leakage. Require advanced graph components to demonstrate incremental benefit over cheaper configurations.
+
+The [full review](core-algorithm-review.md#proposed-updates-and-acceptance-criteria) supplies the evidence, worked robotics example, acceptance criteria and implementation order for these amendments. Adopt them through explicit specification updates before changing live admission or learning policies.
 
 ## Sources
 

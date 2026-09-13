@@ -62,6 +62,8 @@ See [Feature research](design/feature-research.md) for the competitive landscape
 
 See [Core algorithm proposal](design/core-algorithm.md) for the literature review and desired features for idea proximity, selective deep reading, and queryable collection reasoning.
 
+See [Core algorithm design review](design/core-algorithm-review.md) for the comparison with research tools, synthesis of domain research workflows, and proposed improvements to discovery, scientific comparisons and continuous learning.
+
 See [Local model deployment plan](design/local-model-deployment.md) for the RTX 5090 model recommendation, local execution by analysis tier, cloud spending controls, and deployment and evaluation steps.
 
 See [Ubuntu dependency checker and installer (F43)](design/F43-ubuntu-dependency-checker-and-installer.md) for the planned setup feature, dependency checks, install workflow and acceptance criteria. The installer is not implemented yet.
