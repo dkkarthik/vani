@@ -85,7 +85,7 @@ A useful usability lesson is that requests sometimes receive replies explaining 
 
 ## Desired feature catalog
 
-The original research identified F01–F42; F43 was added at the owner's request on September 13, 2026. These 43 feature packages describe the desired product. **P0** means a foundational requirement or minimum useful research workflow; **P1** means a recommended next capability; **P2** means a later audience expansion or specialized workflow. These labels do not override the existing frozen release scope. Each research row links to supporting demand or a relevant product/workflow precedent; a precedent is not a popularity measurement.
+The original research identified F01–F42; F43 and F44 were subsequently added at the owner's request. These 44 feature packages describe the desired product. **P0** means a foundational requirement or minimum useful research workflow; **P1** means a recommended next capability; **P2** means a later audience expansion or specialized workflow. These labels do not override the existing frozen release scope. Each research row links to supporting demand or a relevant product/workflow precedent; a precedent is not a popularity measurement.
 
 ### Collect and maintain the library
 
@@ -169,6 +169,12 @@ The original research identified F01–F42; F43 was added at the owner's request
 | ID | Priority | Desired feature | Concrete expected behavior | Basis |
 | --- | --- | --- | --- | --- |
 | F43 | P1 | [Ubuntu dependency checker and installer](F43-ubuntu-dependency-checker-and-installer.md) | Inspect dependencies without changes; install missing Ubuntu packages and local models; preserve existing libraries/configuration; resume failures and verify app, PDF, database and GPU readiness. Planned, not implemented. | Owner request, September 13, 2026; [local deployment plan](local-model-deployment.md). |
+
+### Local collection interaction
+
+| ID | Priority | Desired feature | Concrete expected behavior | Basis |
+| --- | --- | --- | --- | --- |
+| F44 | P1 | [Local-model collection conversations](F44-local-model-collection-conversations.md) | Move collection chat and follow-ups to the local model, ground answers in scoped evidence, retain history and provenance, and prevent cloud fallback. Planned, not implemented. | Owner request; F26 grounding and LM-R01 router. |
 
 ## What a useful knowledge graph should mean
 

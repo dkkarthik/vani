@@ -66,6 +66,8 @@ See [Local model deployment plan](design/local-model-deployment.md) for the RTX 
 
 See [Ubuntu dependency checker and installer (F43)](design/F43-ubuntu-dependency-checker-and-installer.md) for the planned setup feature, dependency checks, install workflow and acceptance criteria. The installer is not implemented yet.
 
+See [Local-model collection conversations (F44)](design/F44-local-model-collection-conversations.md) for planned local-only collection chat, follow-up context, grounded citations and recovery behavior.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:

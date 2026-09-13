@@ -2,6 +2,8 @@
 
 Status: implemented and verified. This specification was written before implementation. See the [usage and verification guide](../docs/19-research-planning.md).
 
+The planned [F44 local collection conversations](F44-local-model-collection-conversations.md) extends this grounding workflow to persistent local-model chat and follow-ups, and migrates the separate legacy cloud-capable conversation path. F44 remains unimplemented.
+
 ## Outcome and interactions
 
 Ask over explicitly selected works and optional selected notes; retrieve matching abstract/page/annotation/note passages and cite every returned quotation, synthesis or inference. Show unavailable evidence and never search outside the chosen corpus.
