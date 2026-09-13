@@ -60,6 +60,8 @@ See [Manual deep refresh](docs/22-manual-deep-refresh.md) to search broadly and 
 
 See [Feature research](design/feature-research.md) for the competitive landscape, user needs, and a prioritized desired-feature catalog informed by reference managers and visual research workflows.
 
+See [Core algorithm proposal](design/core-algorithm.md) for the literature review and desired features for idea proximity, selective deep reading, and queryable collection reasoning.
+
 ## Product thesis
 
 Researchers currently move between discovery maps, publisher sites, reference managers, PDF readers, note systems, review platforms, and general-purpose LLMs. VANI 0.1 proves that these activities can form one trustworthy workflow:
