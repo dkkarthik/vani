@@ -1,5 +1,7 @@
 # F43 — Ubuntu dependency checker and installer
 
+> Installation update: [Rootless installation revision](F43-rootless-installation.md) supersedes the sudo, Docker, systemd, and old storage-layout portions below. Current setup installs under `~/vani` without root access.
+
 Status: **planned; not implemented**. Requested September 13, 2026. Priority: P1. This feature adds a repeatable Ubuntu setup and diagnostics workflow to VANI. No executable installer, dependency installation or machine configuration is delivered by this specification.
 
 ## Outcome

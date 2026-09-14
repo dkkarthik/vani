@@ -1,6 +1,10 @@
 {
-  "schemaVersion": 1,
-  "ubuntu": ["22.04", "24.04", "26.04"],
+  "schemaVersion": 2,
+  "ubuntu": [
+    "22.04",
+    "24.04",
+    "26.04"
+  ],
   "architecture": "x86_64",
   "node": {
     "version": "22.22.0",
@@ -12,21 +16,28 @@
     "url": "https://github.com/ollama/ollama/releases/download/v0.34.0/ollama-linux-amd64.tar.zst",
     "sha256": "cf95886728959aa09910bb34de5cca1cc5a8f68003b5597197d3f2c2d57c0804"
   },
-  "postgres": "pgvector/pgvector:pg18",
   "models": {
     "local-5090": "qwen3.8:27b-q4_K_M",
     "local-small": "qwen3.5:9b",
     "embedding": "qwen3-embedding:0.6b"
   },
-  "packages": [
-    "ca-certificates",
-    "curl",
-    "xz-utils",
-    "zstd",
-    "poppler-utils",
-    "docker.io",
-    "docker-compose-v2",
-    "postgresql-client"
+  "verification": "Micromamba/standalone Conda checksums and PostgreSQL/pgvector package metadata verified against conda-forge 2026-09-14. Node/Ollama checksums retained from 2026-09-13. Transitive packages resolve from conda-forge and are recorded in installed-packages.txt; this is not a fully locked environment. Ubuntu/RTX 5090 acceptance remains required.",
+  "micromamba": {
+    "version": "2.9.0",
+    "url": "https://conda.anaconda.org/conda-forge/linux-64/micromamba-2.9.0-0.tar.bz2",
+    "sha256": "8761c382127e6363bd9e0a2451aa3ef90d071a79133f736e2f759a3bf13040dd"
+  },
+  "localPackages": [
+    "postgresql=18.6",
+    "pgvector=0.8.6",
+    "poppler",
+    "tar",
+    "xz",
+    "zstd"
   ],
-  "verification": "Official Node checksum and GitHub Ollama asset SHA-256 verified 2026-09-13. Ubuntu and RTX 5090 hardware acceptance remains to be run. Models and database image are recorded by digest at installation."
+  "conda": {
+    "version": "26.5.2",
+    "url": "https://conda.anaconda.org/conda-forge/linux-64/conda-standalone-26.5.2-h643be8f_1.conda",
+    "sha256": "1c5f11bcc585e1dffabda0aad96838a3290339d68504479422533b008c10d2fd"
+  }
 }

@@ -2,41 +2,60 @@
 
 VANI — **Visualizing Academic Networks and Ideas**. **See how ideas connect.**
 
-## Ubuntu installation
+## Ubuntu installation — no root or sudo
 
-Use the school desktop's normal user account, not a root shell. The installer targets Ubuntu 22.04, 24.04 and 26.04 on x86_64. Actual Ubuntu/RTX 5090 acceptance still needs to run on that machine; the development verification uses macOS and PostgreSQL 18.
+Use a normal account on Ubuntu 22.04, 24.04 or 26.04 x86_64. No root access, sudo, Docker, systemd setup, or compiler is needed. The source checkout can be anywhere, including `~/vani`; the installed application is a separate snapshot in `~/vani/app`.
 
 ```bash
-git clone https://github.com/dkkarthik/vani.git
-cd vani
+git clone https://github.com/dkkarthik/vani.git vani-source
+cd vani-source
+bash scripts/setup-ubuntu.sh --check --profile local-5090
 bash scripts/setup-ubuntu.sh --dry-run --profile local-5090
 bash scripts/setup-ubuntu.sh --install --profile local-5090
 ```
 
-The 5090 profile uses `qwen3.8:27b-q4_K_M` for reading and reasoning, and `qwen3-embedding:0.6b` for embeddings. It targets a 32 GB GPU, nominal 64 GB system RAM and at least 80 GiB free disk. The smaller profile uses `qwen3.5:9b`; `app` installs the application without models. Neither requires a cloud API key or CUDA toolkit.
+The installer always prints the full dependency inventory **before making installation changes**, including every missing item and its remedy. `local` and `setup` items are installed automatically inside your home directory. `host` blockers are reported together, and installation stops without changes until they are resolved. `--check --json` returns `checks`, `missing`, and `blockers` arrays. Missing local dependencies are expected before the first install; check exits 2 in that case.
 
-The installer downloads pinned, SHA-256-verified Node 22.22.0 and Ollama archives, installs Ubuntu packages, creates a private PostgreSQL Docker project, builds VANI, migrates the database, and starts user services. It never runs npm as root. It preserves `.env` values, parses them as data, stores new secrets with mode 0600, and backs up the database before migration. An incompatible existing database/client or service stops installation with an error; it is not overwritten.
+Host requirements: Python 3.10+ with SSL, bz2 and lzma modules, working HTTPS certificates, writable home storage, and a supported OS/architecture. For local models, a working NVIDIA GPU driver must already be available. If the driver is missing, ask the system administrator; VANI never installs drivers or attempts privilege escalation. The 5090 profile needs nominal 64 GB RAM, a 32 GB RTX 5090, and 80 GiB free home space. `local-small` needs 16 GiB RAM and an NVIDIA GPU; its inference speed/memory fit must be tested. `app` requires 15 GiB and skips GPU/model provisioning. No CUDA toolkit or cloud API key is required.
 
-Default native endpoints are UI `http://127.0.0.1:3000`, API `http://127.0.0.1:8080`, installer-owned Ollama `http://127.0.0.1:11435`, and PostgreSQL `127.0.0.1:5432`. Existing `.env` values take precedence. The installer-owned Ollama service disables cloud models, uses one parallel request and one loaded model. Docker deployment from earlier releases is not the supported local-model path because the inference router requires a loopback endpoint in the API's network namespace.
+Setup downloads checksum-pinned Node and Ollama. A checksum-pinned micromamba archive extractor unpacks standalone Conda, which installs PostgreSQL 18.6, pgvector 0.8.6, Poppler, tar, xz, zstd and their shared libraries into a private environment. Conda environment registration is disabled so it does not add a user-wide environment registry. Shell profiles and existing environments are untouched. Transitive package versions are resolved from conda-forge, verified by the package manager, and recorded in `~/vani/installed-packages.txt`; they are not a fully locked dependency set. Package references: [conda-forge pgvector](https://anaconda.org/conda-forge/pgvector), [standalone Conda](https://github.com/conda/conda-standalone).
+
+The reader is `qwen3.8:27b-q4_K_M`; the embedding model is `qwen3-embedding:0.6b`. `local-small` uses `qwen3.5:9b`. Actual Ubuntu/RTX 5090 installation and model acceptance still need to run on your machine.
+
+All VANI application data and managed runtime files live under `~/vani`, regardless of `XDG_DATA_HOME`:
+
+| Folder/file | Contents |
+| --- | --- |
+| `app/` | Installed application snapshot and npm packages |
+| `config/vani.env` | Private configuration and database credentials |
+| `runtime/` | Node, PostgreSQL, PDF tools, archive bootstrap, Conda and Ollama |
+| `postgres/` | PostgreSQL cluster, including collections, conversations and reasoning |
+| `data/` | Local PDFs and application object storage |
+| `models/` | Ollama model weights |
+| `cache/`, `tmp/` | Download/package caches and temporary working files |
+| `backups/` | SQL dump before every migration |
+| `logs/` | Supervisor, database, model server, API and web logs |
+| `bin/vani` | Start/stop/status command |
+
+Secrets are mode 0600; new managed directories are private. Settings are parsed as data, never sourced as shell code. The installer preserves existing managed credentials and backs up before migrations. It rejects unmanaged clusters and PostgreSQL major-version mismatches. PostgreSQL uses SCRAM authentication and binds to `127.0.0.1:55432`; UI/API/Ollama use loopback ports 3000/8080/11435. Port conflicts fail explicitly. The owned Ollama runtime disables cloud models and loads at most one model at once.
 
 ```bash
-bash scripts/setup-ubuntu.sh --check --profile local-5090 --json
+~/vani/bin/vani status
+~/vani/bin/vani stop
+~/vani/bin/vani start
 bash scripts/setup-ubuntu.sh --install --profile local-5090 --resume
-npm run models:smoke
+bash scripts/setup-ubuntu.sh --check --profile local-5090 --json
 ```
 
-No arguments print help. `--check` and `--dry-run` do not install, write configuration or invoke sudo. They inspect local services; outbound connectivity checks require `--check-network`. `--install-driver` explicitly authorizes Ubuntu's recommended NVIDIA driver installation; a requested reboot exits 4. `--skip-models` defers downloads and reports incomplete model readiness. `--yes` accepts the printed install plan; `--with-dev-tools` adds compiler/Git packages. Exit codes: 0 ready/help, 2 dependencies incomplete, 3 unsupported host, 4 reboot, 1 operational failure; invalid CLI syntax exits 2.
+Start launches a detached user-owned supervisor; stop shuts down the application and database cleanly. A child-process failure shuts down its siblings and leaves diagnostics in `~/vani/logs`. There is no automatic boot service or restart-on-crash promise. Start VANI after login/reboot; school logout policies may terminate user processes. The foreground equivalent is `python3 ~/vani/app/scripts/setup/launch.py`.
 
-State, journals, runtimes, model files, database configuration and backups live under `$XDG_DATA_HOME/vani` (default `~/.local/share/vani`). An ownership marker prevents another checkout from silently taking over that installation. Resume rechecks idempotent operations instead of trusting a potentially stale checkpoint. Download interruption is safe but restarts the current archive transfer. Existing external PostgreSQL instances require a compatible `pg_dump` client; the owned container uses its matching client.
+For upgrades, pull the source checkout and rerun installation. Setup stops the managed supervisor, refreshes the application snapshot, rebuilds, backs up and migrates, then starts it again. `--resume` retries checked steps after interruption. Do not manually edit `~/vani/app`; it is replaced on upgrades. The previous snapshot is retained in `app-previous/` until the next upgrade. Existing dependency environments are checked and reused, not silently upgraded across PostgreSQL major versions.
 
-```bash
-systemctl --user status vani vani-ollama
-journalctl --user -u vani -u vani-ollama -n 100
-systemctl --user restart vani
-systemctl --user stop vani vani-ollama
-```
+No arguments show help. `--check` and `--dry-run` do not write files; outbound connectivity probes require `--check-network` (local service probes are always allowed). `--yes` accepts the printed local installation plan. `--skip-models` defers model downloads and leaves model readiness incomplete. The old privileged `--install-driver` and `--with-dev-tools` flags are removed. Exit codes: 0 ready/help, 2 missing dependencies or host blockers, 3 unsupported OS, 1 operational failure. Invalid CLI options exit 2.
 
-User services normally start at login. For unattended boot, explicitly enable lingering with `loginctl enable-linger "$USER"`. Services are local single-user tools; exposing them to a network requires a separate authenticated deployment design.
+### Existing installations
+
+A source `.env` or earlier `~/.local/share/vani` installation marker blocks a fresh home install. This is deliberate: setup will not point at an old database or silently replace your library with an empty one. Existing data is left untouched. Preserve an export of the old database, its `.env`, PDF/object-store files, and model files before migration. Stop the old API/worker before moving data. Archive the old source `.env` and installation marker after backup to allow a fresh install, then explicitly restore the database and object store into the new home installation using matching PostgreSQL tools. Source `.env` settings are not imported. If the old Docker database needs administrator access for export, obtain that export before proceeding. Automatic cross-layout data migration is not implemented.
 
 ## Using the research engine
 
@@ -86,7 +105,7 @@ Routine synthesis, embeddings, D1/D2 and conversations are local. Optional cloud
 
 Development verification covers migration from an empty PostgreSQL database, the D0–D3 flow with local provider fixtures and a real PDF, stale-focus protection, membership history, server-side conversation scope, quote validation, local routing, cancellation/limits, and installer planning/configuration parsing. Model responses in automated tests are fixtures; they do not establish scientific retrieval accuracy.
 
-Before relying on the school desktop unattended, run setup check and `npm run models:smoke`, verify the reported model digests/GPU residency, exercise a real seeded collection through D3, and inspect quiet-window audit reports. Ubuntu installation, NVIDIA-driver changes, sustained GPU residency, throughput and retrieval-quality calibration remain target-machine acceptance work.
+Before relying on the school desktop unattended, run setup check and `npm run models:smoke`, verify the reported model digests/GPU residency, exercise a real seeded collection through D3, and inspect quiet-window audit reports. Ubuntu installation, sustained GPU residency, throughput and retrieval-quality calibration remain target-machine acceptance work.
 
 ### Recorded development verification — 2026-09-13
 
@@ -96,3 +115,10 @@ Before relying on the school desktop unattended, run setup check and `npm run mo
 - Built application in headless Chrome: collection focus controls and the local conversation route rendered without page errors. The existing structured question planner remains available at `/questions`.
 - A synthetic sparse graph of 20,000 candidates ranked in approximately 1.7 seconds in a background worker on the development machine. This excludes retrieval, embeddings, PDF processing and model generation and is not a 5090 throughput benchmark.
 - Ubuntu VM installation, real local-model inference and GPU performance were not run on this development host. Use the setup and model-smoke commands on the school desktop to finish hardware acceptance.
+
+### Rootless installer verification — 2026-09-14
+
+- Eighteen installer tests passed, including real child-process shutdown and crash cleanup, complete missing-dependency reports, read-only planning, credentials/path guards and backup-before-migration failure handling.
+- A real temporary PostgreSQL 18 cluster passed initdb, SCRAM authentication, vector/pg_trgm loading, migration, second-run backup preservation and clean shutdown. This used native macOS PostgreSQL, not the Ubuntu binaries.
+- The Linux package set resolved successfully with Ubuntu 22.04 kernel/glibc metadata (90 packages). The standalone Conda archive checksum and executable layout were verified. This verifies package resolution and archive structure, not execution of the Linux installer.
+- Python compilation, shell syntax and repository lint passed. End-to-end Ubuntu/5090 installation remains target-machine acceptance work.

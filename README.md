@@ -12,9 +12,12 @@ The repository also contains the working VANI application: a React interface, Fa
 ### Ubuntu desktop with local models
 
 ```bash
+bash scripts/setup-ubuntu.sh --check --profile local-5090
 bash scripts/setup-ubuntu.sh --dry-run --profile local-5090
 bash scripts/setup-ubuntu.sh --install --profile local-5090
 ```
+
+No root, sudo or Docker is needed. Missing dependencies are reported first; the application, database, PDFs, models and caches are installed under `~/vani`. Use `~/vani/bin/vani start|stop|status` to control it. A working NVIDIA driver must already be installed by your administrator.
 
 Open `http://127.0.0.1:3000`. See the [VANI 1.0 installation and operations guide](docs/23-vani-1.0.md) for dependency checks, upgrades, calibration, local conversations and target-hardware acceptance.
 

@@ -1,5 +1,7 @@
 # VANI 1.0 implementation contract
 
+> Installation update: [Rootless installation revision](F43-rootless-installation.md) supersedes the sudo, Docker, systemd, and old storage-layout portions below. Current setup installs under `~/vani` without root access.
+
 This release adopts the core algorithm, CA35 learning audits, LM-R01, F43/F44 and review amendments R1–R6. Existing libraries are migrated additively; saved membership and historical admission reasons are preserved. Experimental research variants (node-split graphs, model fine-tuning and cross-collection transfer) remain evaluation-gated experiments, as specified in the core design.
 
 ## Delivery
