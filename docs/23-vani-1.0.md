@@ -53,6 +53,19 @@ For upgrades, pull the source checkout and rerun installation. Setup stops the m
 
 No arguments show help. `--check` and `--dry-run` do not write files; outbound connectivity probes require `--check-network` (local service probes are always allowed). `--yes` accepts the printed local installation plan. `--skip-models` defers model downloads and leaves model readiness incomplete. The old privileged `--install-driver` and `--with-dev-tools` flags are removed. Exit codes: 0 ready/help, 2 missing dependencies or host blockers, 3 unsupported OS, 1 operational failure. Invalid CLI options exit 2.
 
+### Build fails with `tsc: not found`
+
+The initial rootless installer ran `npm ci` with `NODE_ENV=production`, which omitted TypeScript and other development dependencies required to build VANI. The installer now uses `npm ci --include=dev` while keeping the runtime in production mode. npm documents this behavior in its [omit/include settings](https://docs.npmjs.com/cli/v11/commands/npm-ci/#include).
+
+From your original Git checkout (not the generated `~/vani/app` snapshot), update and resume:
+
+```bash
+git pull --ff-only
+bash scripts/setup-ubuntu.sh --install --profile local-5090 --resume
+```
+
+Use your original profile if different. Resume reinstalls the application dependencies with build tools and reruns the build; it preserves the managed database, PDFs, models and configuration. No global TypeScript package or sudo is required.
+
 ### Existing installations
 
 A source `.env` or earlier `~/.local/share/vani` installation marker blocks a fresh home install. This is deliberate: setup will not point at an old database or silently replace your library with an empty one. Existing data is left untouched. Preserve an export of the old database, its `.env`, PDF/object-store files, and model files before migration. Stop the old API/worker before moving data. Archive the old source `.env` and installation marker after backup to allow a fresh install, then explicitly restore the database and object store into the new home installation using matching PostgreSQL tools. Source `.env` settings are not imported. If the old Docker database needs administrator access for export, obtain that export before proceeding. Automatic cross-layout data migration is not implemented.

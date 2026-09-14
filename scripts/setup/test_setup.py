@@ -89,6 +89,9 @@ class SetupTests(unittest.TestCase):
   self.assertTrue(u.CONFIG.exists());self.assertTrue((self.state/'bin/vani').exists());self.assertTrue((self.state/'health.json').exists())
   for args,kw in calls:
    if args[0]=='npm':self.assertEqual(kw['cwd'],u.APP);self.assertEqual(kw['env']['CONDA_REGISTER_ENVS'],'false')
+  package_call=next((args,kw) for args,kw in calls if args[:2]==['npm','ci'])
+  self.assertEqual(package_call[0],['npm','ci','--include=dev'])
+  self.assertEqual(package_call[1]['env']['NODE_ENV'],'production')
   self.assertEqual(calls[-1][0],[str(self.state/'bin/vani'),'start'])
  def test_no_privileged_or_system_service_commands(self):
   import ast

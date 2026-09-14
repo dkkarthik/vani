@@ -318,7 +318,8 @@ def install(args):
             settings=configure(args);env=runtime_env(settings)
             step('Application snapshot',snapshot)
             private_write(STATE/'profile',args.profile)
-            step('Application packages',lambda:command(['npm','ci'],cwd=APP,env=env))
+            # Runtime stays in production mode, but building from source requires dev tools.
+            step('Application packages',lambda:command(['npm','ci','--include=dev'],cwd=APP,env=env))
             step('Build',lambda:command(['npm','run','build'],cwd=APP,env=env))
             step('Database backup and migration',lambda:database(settings,lambda:command(['npm','run','db:migrate'],cwd=APP,env=env)))
             if args.profile!='app': step('Ollama',lambda:download_runtime('ollama'))
