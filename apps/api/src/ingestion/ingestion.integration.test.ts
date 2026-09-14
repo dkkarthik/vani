@@ -1,3 +1,5 @@
+import { config as modelConfig } from "../config.js";
+import { resetModelIdentity } from "../models/router.js";
 import { readFile } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, it, expect, vi } from "vitest";
 import { v7 as uuid } from "uuid";
@@ -184,16 +186,20 @@ it.skipIf(!enabled)(
         filename: "seed.pdf",
         seed: true,
       });
-    const fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        message: {
-          content: JSON.stringify({
-            topic: "Demonstration learning for reliable control",
+    resetModelIdentity();
+    const fetch = vi.fn(async (url) =>
+      String(url).endsWith("/api/tags")
+        ? Response.json({
+            models: [{ name: modelConfig.ollamaModel, digest: "test" }],
+          })
+        : Response.json({
+            message: {
+              content: JSON.stringify({
+                topic: "Demonstration learning for reliable control",
+              }),
+            },
           }),
-        },
-      }),
-    }));
+    );
     vi.stubGlobal("fetch", fetch);
     const seed = await configureCollection(repo, col.id, {
       mode: "papers",
@@ -213,7 +219,9 @@ it.skipIf(!enabled)(
       topic: "My precise focus",
     });
     expect(config.topic).toBe("My precise focus");
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(
+      fetch.mock.calls.filter(([url]) => String(url).endsWith("/api/chat")),
+    ).toHaveLength(1);
   },
 );
 it.skipIf(!enabled)(
@@ -249,18 +257,21 @@ it.skipIf(!enabled)(
     await queueEnrichment(w.id);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
-          message: {
-            content: JSON.stringify({
-              text: "The primary contribution is a representation for transferring learned behavior between robots.",
-              sourceLabel: "abstract",
-              quote,
+      vi.fn(async (url) =>
+        String(url).endsWith("/api/tags")
+          ? Response.json({
+              models: [{ name: modelConfig.ollamaModel, digest: "test" }],
+            })
+          : Response.json({
+              message: {
+                content: JSON.stringify({
+                  text: "The primary contribution is a representation for transferring learned behavior between robots.",
+                  sourceLabel: "abstract",
+                  quote,
+                }),
+              },
             }),
-          },
-        }),
-      })),
+      ),
     );
     await enrichPaper(w.id);
     let e = (
@@ -273,18 +284,21 @@ it.skipIf(!enabled)(
     expect(e.summary.evidence[0].quote).toBe(quote);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
-          message: {
-            content: JSON.stringify({
-              text: "An unsupported claim about general intelligence.",
-              sourceLabel: "abstract",
-              quote: "Fabricated evidence not present in any source.",
+      vi.fn(async (url) =>
+        String(url).endsWith("/api/tags")
+          ? Response.json({
+              models: [{ name: modelConfig.ollamaModel, digest: "test" }],
+            })
+          : Response.json({
+              message: {
+                content: JSON.stringify({
+                  text: "An unsupported claim about general intelligence.",
+                  sourceLabel: "abstract",
+                  quote: "Fabricated evidence not present in any source.",
+                }),
+              },
             }),
-          },
-        }),
-      })),
+      ),
     );
     await enrichPaper(w.id);
     e = (

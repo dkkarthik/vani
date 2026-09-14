@@ -1,5 +1,5 @@
-import { queueEnrichment } from '../ingestion/enrichment.js';
-import { feedbackFor,feedbackContext } from '../planning/monitor.js';
+import { queueEnrichment } from "../ingestion/enrichment.js";
+import { feedbackFor, feedbackContext } from "../planning/monitor.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { v7 as uuid } from "uuid";
@@ -58,6 +58,7 @@ export function openAlexCandidate(item: any): Candidate {
       const parts = String(a.author?.display_name ?? "Unknown").split(/\s+/);
       return { given: parts.slice(0, -1).join(" "), family: parts.at(-1)! };
     }),
+    accessClass: item.open_access?.is_oa ? "open_access" : "metadata_only",
     connector: "openalex",
     externalId: item.id,
     sourcePayload: item,
@@ -251,7 +252,10 @@ export async function runDiscovery(input: z.infer<typeof Input>) {
     c.existingWorkId = existing?.id ?? null;
   }
   return {
-    ...await feedbackFor(items,feedbackContext(input.query,input.seeds,input.collectionId)),
+    ...(await feedbackFor(
+      items,
+      feedbackContext(input.query, input.seeds, input.collectionId),
+    )),
     coverage,
     excluded,
     bounded: true,
@@ -275,7 +279,8 @@ export async function registerDiscovery(
         coverage: data.coverage,
         excluded: data.excluded,
         limits: data.limits,
-          suppressed:data.suppressed,contextKey:data.contextKey,
+        suppressed: data.suppressed,
+        contextKey: data.contextKey,
       }),
     ]);
     return { id, ...data };
@@ -335,7 +340,13 @@ export async function registerDiscovery(
       await queueEnrichment(work!.id);
       items.push({ resultId: c.resultId, work });
       if (d.collectionId)
-        await repository.addToCollection(d.collectionId, [work!.id],{kind:"selected_discovery",text:"You selected this recommendation from Explorer.",provider:c.connector,paths:c.paths??[],runId:id});
+        await repository.addToCollection(d.collectionId, [work!.id], {
+          kind: "selected_discovery",
+          text: "You selected this recommendation from Explorer.",
+          provider: c.connector,
+          paths: c.paths ?? [],
+          runId: id,
+        });
     }
     // Citation facts only when both endpoints exist locally; provider payload is the evidence.
     const records = (

@@ -53,6 +53,10 @@ export async function storePdf(
     "DELETE FROM paper_first_pass WHERE canonical_work(work_id)=canonical_work($1) AND report->>'status'<>'full_text'",
     [workId],
   );
+  await pool.query(
+    `UPDATE core_candidate c SET state='stale',proximity='unassessed' WHERE c.state IN ('accepted','reviewed') AND (c.work_id=$1 OR EXISTS(SELECT 1 FROM core_focus f WHERE f.collection_id=c.collection_id AND f.profile->'anchors' @> jsonb_build_array(jsonb_build_object('workId',$1::text))))`,
+    [workId],
+  );
   return id;
 }
 export function contributionExcerpt(text: string) {
@@ -80,13 +84,13 @@ export async function contributionSummary(work: any) {
   const sources: any[] = [];
   if (work.abstract)
     sources.push({ label: "abstract", text: work.abstract.slice(0, 6000) });
-  for (const p of (doc?.pages ?? []).slice(0, 12))
+  for (const p of (doc?.pages ?? []).slice(0, 4))
     if (p.text.trim())
       sources.push({
         label: "page " + p.page,
         page: p.page,
         attachmentId: doc.id,
-        text: p.text.slice(0, 6000),
+        text: p.text.slice(0, 3500),
       });
   if (!sources.length)
     return {

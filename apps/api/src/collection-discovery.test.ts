@@ -9,8 +9,14 @@ const mocks = vi.hoisted(() => ({
   clientQuery: vi.fn(),
   release: vi.fn(),
   discover: vi.fn(),
+  enqueue: vi.fn(),
   synthesize: vi.fn(),
   firstPass: vi.fn(),
+}));
+vi.mock("./core/service.js", () => ({
+  enqueueCore: mocks.enqueue,
+  runCoreWorker: vi.fn(),
+  resumeEvidence: vi.fn(),
 }));
 vi.mock("./db.js", () => ({
   query: mocks.query,
@@ -191,7 +197,7 @@ describe("living collections", () => {
     mocks.clientQuery
       .mockResolvedValueOnce({ rows: [{ locked: true }] })
       .mockResolvedValueOnce({ rows: [{ id: "c", discovery: seed }] });
-    mocks.discover.mockRejectedValue(new Error("Sources unavailable"));
+    mocks.enqueue.mockRejectedValue(new Error("Sources unavailable"));
     await runDueCollections(new Repository());
     expect(mocks.query).toHaveBeenCalledWith(
       expect.stringContaining("interval '1 hour'"),

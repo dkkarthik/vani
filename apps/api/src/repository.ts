@@ -203,6 +203,11 @@ export class Repository {
       if(prior)prior.evidence=[...new Map([...(prior.evidence??[]),...row.evidence].map(value=>[JSON.stringify(value),value])).values()] as Relationship['evidence'];
       else edges.set(key,{id:row.id,sourceId:row.canonical_source,targetId:row.canonical_target,predicate:row.predicate,confidence:row.confidence,verificationStatus:row.verification_status,evidence:row.evidence});
     }
+    if(collectionId&&ids.length){
+      const current=await query<any>("SELECT c.id,c.work_id,c.assessment FROM core_candidate c JOIN core_focus f ON f.collection_id=c.collection_id WHERE c.collection_id=$1 AND c.focus_version=f.version AND c.state<>'stale' AND c.work_id=ANY($2::uuid[])",[collectionId,ids]);
+      const predicates:Record<string,Relationship['predicate']>={compares:'compares_against',extends:'extends',uses:'uses_method',contradicts:'contradicts',analogous:'semantically_similar'};
+      for(const c of current.rows)for(const r of c.assessment.relationships??[]){const predicate=predicates[r.predicate];if(!predicate||!ids.includes(r.targetId)||r.targetId===c.work_id)continue;const key=[c.work_id,r.targetId,predicate].join(':');if(!edges.has(key))edges.set(key,{id:'core:'+c.id+':'+r.targetId+':'+predicate,sourceId:c.work_id,targetId:r.targetId,predicate,confidence:0,verificationStatus:'inferred',evidence:(c.assessment.evidence??[]).filter((e:any)=>r.sourceIds.includes(e.sourceId)).map((e:any)=>({exactText:e.quote,section:'VANI comparison; confidence uncalibrated'}))});}
+    }
     return {nodes:selected.map(row=>({id:row.id,label:row.title,year:row.year,venue:row.venue??'',gist:row.gist??'',status:row.status??undefined})),edges:[...edges.values()],truncated:rows.rows.length>limit};
   }
 

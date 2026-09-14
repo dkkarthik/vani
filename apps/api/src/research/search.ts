@@ -1,9 +1,10 @@
+import { config } from "../config.js";
 import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ResearchId as Id, LibraryRule } from "@vani/shared";
 import { pool } from "../db.js";
-import { config } from "../config.js";
+import { embed as localEmbed } from "../models/router.js";
 import { libraryWhere } from "./organization.js";
 import { fail } from "../metadata.js";
 import { indexDocument } from "./documents.js";
@@ -87,28 +88,14 @@ export function rankChunks(
 export async function embed(texts: string[]) {
   if (!model())
     throw new Error("No local embedding model configured (VANI_EMBED_MODEL).");
-  const result = await fetch(`${config.ollamaBaseUrl}/api/embed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: model(), input: texts, truncate: true }),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!result.ok)
-    throw new Error(`Local embedding service returned HTTP ${result.status}.`);
-  const data = (await result.json()) as any;
-  if (
-    !Array.isArray(data.embeddings) ||
-    data.embeddings.length !== texts.length ||
-    data.embeddings.some(
-      (v: any) =>
-        !Array.isArray(v) ||
-        !v.length ||
-        v.length > 8192 ||
-        v.some((n: any) => typeof n !== "number" || !Number.isFinite(n)),
-    )
-  )
-    throw new Error("Embedding service returned invalid vectors.");
-  return data.embeddings as number[][];
+  try {
+    return (await localEmbed(texts, { embeddingModel: model() })).vectors;
+  } catch (error) {
+    throw new Error(
+      "Local embedding service returned invalid vectors or is unavailable: " +
+        String(error),
+    );
+  }
 }
 export async function corpus(
   rule = LibraryRule.parse({}),
@@ -160,73 +147,63 @@ export async function corpus(
       });
     }
   };
-  works
-    .slice(0, 3000)
-    .forEach((w) =>
-      add({
-        id: "w:" + w.id,
-        workId: w.id,
-        title: w.title,
-        key: w.citation_key,
-        kind: "metadata",
-        text: w.text,
-        url: "/read/" + w.id,
-      }),
-    );
-  pages
-    .slice(0, 3000)
-    .forEach((p) =>
-      add({
-        id: "p:" + p.attachment_id + ":" + p.value.page,
-        workId: p.id,
-        title: p.title,
-        key: p.citation_key,
-        kind: "page",
-        text: p.value.text,
-        page: p.value.page,
-        url: `/read/${p.id}?attachment=${p.attachment_id}&page=${p.value.page}`,
-      }),
-    );
-  notes
-    .slice(0, 3000)
-    .forEach((n) =>
-      add({
-        id: "n:" + n.id,
-        workId: n.work_id,
-        title: n.title,
-        key: n.citation_key,
-        kind: "note",
-        text: n.title + "\n" + n.markdown,
-        url: "/notes/" + n.id,
-      }),
-    );
-  looseNotes
-    .slice(0, 3000)
-    .forEach((n) =>
-      add({
-        id: "n:" + n.id,
-        workId: null,
-        title: n.title,
-        key: "Note",
-        kind: "note",
-        text: n.title + "\n" + n.markdown,
-        url: "/notes/" + n.id,
-      }),
-    );
-  annotations
-    .slice(0, 3000)
-    .forEach((a) =>
-      add({
-        id: "a:" + a.id,
-        workId: a.work_id,
-        title: a.title,
-        key: a.citation_key,
-        kind: "annotation",
-        text: a.text,
-        page: a.page_start,
-        url: "/passages/" + a.id,
-      }),
-    );
+  works.slice(0, 3000).forEach((w) =>
+    add({
+      id: "w:" + w.id,
+      workId: w.id,
+      title: w.title,
+      key: w.citation_key,
+      kind: "metadata",
+      text: w.text,
+      url: "/read/" + w.id,
+    }),
+  );
+  pages.slice(0, 3000).forEach((p) =>
+    add({
+      id: "p:" + p.attachment_id + ":" + p.value.page,
+      workId: p.id,
+      title: p.title,
+      key: p.citation_key,
+      kind: "page",
+      text: p.value.text,
+      page: p.value.page,
+      url: `/read/${p.id}?attachment=${p.attachment_id}&page=${p.value.page}`,
+    }),
+  );
+  notes.slice(0, 3000).forEach((n) =>
+    add({
+      id: "n:" + n.id,
+      workId: n.work_id,
+      title: n.title,
+      key: n.citation_key,
+      kind: "note",
+      text: n.title + "\n" + n.markdown,
+      url: "/notes/" + n.id,
+    }),
+  );
+  looseNotes.slice(0, 3000).forEach((n) =>
+    add({
+      id: "n:" + n.id,
+      workId: null,
+      title: n.title,
+      key: "Note",
+      kind: "note",
+      text: n.title + "\n" + n.markdown,
+      url: "/notes/" + n.id,
+    }),
+  );
+  annotations.slice(0, 3000).forEach((a) =>
+    add({
+      id: "a:" + a.id,
+      workId: a.work_id,
+      title: a.title,
+      key: a.citation_key,
+      kind: "annotation",
+      text: a.text,
+      page: a.page_start,
+      url: "/passages/" + a.id,
+    }),
+  );
   return {
     chunks,
     truncated:

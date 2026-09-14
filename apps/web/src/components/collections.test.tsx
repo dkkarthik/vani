@@ -19,7 +19,21 @@ vi.mock("../context", () => ({
   }),
 }));
 vi.mock("../api", () => ({
-  request:vi.fn(async()=>({keywords:[],version:1,edited:false})),
+  request: vi.fn(async (path: string) =>
+    path.includes("/core")
+      ? {
+          focus: {
+            version: 1,
+            profile: { question: "Research focus fixture", mode: "review" },
+          },
+          runs: [],
+          candidates: [],
+          counts: [],
+          audits: [],
+          policies: [],
+        }
+      : { keywords: [], version: 1, edited: false },
+  ),
   api: {
     collections: vi.fn(),
     collectionMembers: vi.fn(),
@@ -43,6 +57,7 @@ it("keeps NEW visible during a visit, but not on a subsequent visit with cached 
     createdAt: "2026-09-01",
     updatedAt: "2026-09-01",
   });
+  vi.mocked(api.works).mockResolvedValue({ items: [work] });
   let seen = false;
   vi.mocked(api.collections).mockResolvedValue({
     items: [

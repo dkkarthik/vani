@@ -1,3 +1,8 @@
+import {
+  enqueueCore,
+  stageCandidate,
+  acceptCandidate,
+} from "./core/service.js";
 import { beforeAll, afterAll, afterEach, it, expect, vi } from "vitest";
 import { v7 as uuid } from "uuid";
 import { buildApp } from "./app.js";
@@ -167,7 +172,7 @@ it.skipIf(!enabled)(
   },
 );
 it.skipIf(!enabled)(
-  "automatic discovery uses the edited query and records actual matching evidence",
+  "discovery uses edited queries and preserves accepted reasons after a focus change",
   async () => {
     const col = await create();
     await edit(col.id, ["mapping"], 1);
@@ -206,16 +211,30 @@ it.skipIf(!enabled)(
     );
     await runDueCollections(repo);
     const members = await collectionMembers(repo, col.id);
-    expect(members.items).toHaveLength(1);
-    expect(members.items[0]?.inclusionReason?.matched).toEqual(["mapping"]);
-    expect(members.items[0]?.inclusionReason?.query).toBe("mapping");
-    expect(members.items[0]?.inclusionReason?.evidence?.[0]?.quote).toContain(
-      "Mapping",
+    expect(members.items).toHaveLength(0);
+    const run = await enqueueCore(col.id);
+    expect(run.snapshot.publicQueries).toEqual(["mapping"]);
+    const candidate = await stageCandidate(
+      run,
+      {
+        title: "Mapping robot environments " + stamp,
+        abstract: "Mapping improves navigation.",
+        connector: "test",
+        externalId: stamp,
+        sourcePayload: {},
+      },
+      { channel: "test", query: "mapping" },
     );
-    expect(mock.discover.mock.calls.some(([q]) => q === "mapping")).toBe(true);
+    await acceptCandidate(candidate.id);
+    const reason = (await collectionMembers(repo, col.id)).items[0]!
+      .inclusionReason;
+    expect(reason?.candidateId).toBe(candidate.id);
     await edit(col.id, ["navigation"], 2);
     const old = (await collectionMembers(repo, col.id)).items[0]!;
-    expect(old.inclusionReason?.matched).toEqual(["mapping"]);
+    expect(old.inclusionReason).toEqual(reason);
     expect(old.currentKeywordMatches).toEqual(["navigation"]);
+    await expect(acceptCandidate(candidate.id)).rejects.toMatchObject({
+      statusCode: 409,
+    });
   },
 );

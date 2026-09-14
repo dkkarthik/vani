@@ -1,16 +1,16 @@
 {
   "name": "@vani/api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "node --env-file-if-exists=../../.env dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx src/cli/migrate.ts",
-    "db:seed": "tsx src/cli/seed.ts"
+    "db:migrate": "node --env-file-if-exists=../../.env --import tsx src/cli/migrate.ts",
+    "db:seed": "node --env-file-if-exists=../../.env --import tsx src/cli/seed.ts"
   },
   "dependencies": {
     "@citation-js/core": "^0.8.2",

@@ -17,7 +17,8 @@ import { api } from './api';
 import { useWorkspace } from './context';
 import { CollectionPage } from './pages/CollectionPage';
 import { DiscoverPage } from './pages/DiscoverPage';
-const AskPage=lazy(()=>import('./planning/Reports').then(m=>({default:m.GroundedQuestionsPage})));
+const AskPage=lazy(()=>import('./pages/AskPage').then(m=>({default:m.AskPage})));
+const GroundedQuestionsPage=lazy(()=>import('./planning/Reports').then(m=>({default:m.GroundedQuestionsPage})));
 import { LibraryPage } from './pages/LibraryPage';
 import { ReaderPage } from './pages/ReaderPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -54,6 +55,7 @@ export function App(){
         <Route path="/organize" element={<OrganizePage/>}/><Route path="/evidence" element={<EvidencePage/>}/><Route path="/search" element={<SearchPage/>}/><Route path="/notes/:noteId" element={<NoteEditorPage/>}/><Route path="/passages/:passageId" element={<ReaderPage/>}/>
         <Route path="/read/:workId" element={<ReaderPage/>}/>
         <Route path="/ask" element={<AskPage/>}/>
+        <Route path="/questions" element={<GroundedQuestionsPage/>}/>
         <Route path="/imports" element={<ImportsPage/>}/>
         <Route path="/works/:workId/metadata" element={<MetadataPage/>}/>
         <Route path="/library" element={<LibraryPage/>}/>

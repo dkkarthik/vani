@@ -58,7 +58,9 @@ export function DeepRefresh({ id }: { id: string }) {
                   running:
                     job.phase === "importing"
                       ? "Updating collection"
-                      : "Searching sources",
+                      : `Processing ${job.phase}`,
+                  paused: "Paused — use refresh to retry",
+                  awaiting_evidence: "Waiting for local PDF evidence",
                   completed: "Deep refresh complete",
                   partial:
                     "Deep refresh complete with source limits or warnings",
@@ -71,7 +73,7 @@ export function DeepRefresh({ id }: { id: string }) {
           </strong>
           <p>
             {job.scanned} unique{" "}
-            {job.scanned === 1 ? "candidate" : "candidates"} reviewed ·{" "}
+            {job.scanned === 1 ? "candidate" : "candidates"} ranked ·{" "}
             {job.added} {job.added === 1 ? "paper" : "papers"} added
           </p>
           {job.error && <p>{job.error}</p>}
@@ -85,16 +87,16 @@ export function DeepRefresh({ id }: { id: string }) {
           )}
           {["completed", "partial"].includes(job.status) && (
             <p>
-              Available PDFs and contribution summaries are queued for local
-              processing.
+              Accepted papers have PDFs and contribution summaries queued for
+              local processing.
             </p>
           )}
         </div>
       )}
       <small>
-        Up to four keyword queries, five seed neighborhoods and 200 relevant
-        additions per refresh. Uses your current keywords and discovery
-        feedback; coverage is not exhaustive.
+        Default ceilings: 20,000 discovery records, 2,000 screened candidates,
+        40 targeted comparisons and 10 deep readings. Admission follows your
+        collection review policy. Coverage is not exhaustive.
       </small>
     </section>
   );

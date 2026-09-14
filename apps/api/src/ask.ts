@@ -1,43 +1,178 @@
-import { v7 as uuidv7 } from 'uuid';
-import type { Answer, AnswerClaim, Work } from '@vani/shared';
-import { config } from './config.js';
-
-const firstSentence = (text: string) => text.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || text.slice(0, 320);
-
-export async function answerQuestion(question: string, works: Work[], notes: Array<{ title: string; markdown: string }>): Promise<Answer> {
-  const usable = works.filter((work) => work.abstract.trim());
-  if (!usable.length) return { id: uuidv7(), status: 'insufficient_evidence', markdown: 'There is not enough full-text or abstract evidence in this scope to answer reliably.',
-    claims: [], limitations: ['Add PDFs or abstracts for the selected papers, then ask again.'], modelProvenance: { provider: 'none', validation: 'evidence_required' }, createdAt: new Date().toISOString() };
-
-  if (config.openAiKey) {
-    const evidence = usable.slice(0, 12).map((work, index) => `[P${index + 1}] ${work.title}\n${work.abstract.slice(0, 1800)}`).join('\n\n');
-    const response = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${config.openAiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: config.openAiModel, temperature: 0.1, response_format: { type: 'json_object' }, messages: [
-        { role: 'system', content: 'Answer only from supplied evidence. Return JSON {claims:[{text,sources:[1]}],limitations:[]}. Separate author limitations from your inference. Never invent a source.' },
-        { role: 'user', content: `Question: ${question}\n\nEvidence:\n${evidence}` }
-      ] }), signal: AbortSignal.timeout(30_000) });
-    if (response.ok) {
-      const raw: any = await response.json();
-      const parsed = JSON.parse(raw.choices?.[0]?.message?.content ?? '{}');
-      const claims: AnswerClaim[] = (parsed.claims ?? []).flatMap((claim: any) => {
-        const sourceNumbers = (claim.sources ?? []).filter((n: number) => usable[n - 1]);
-        if (!sourceNumbers.length) return [];
-        return [{ id: uuidv7(), text: String(claim.text), supportStatus: 'directly_supported' as const,
-          evidence: sourceNumbers.map((n: number) => ({ type: 'paper_abstract', sourceId: usable[n - 1]!.id, label: usable[n - 1]!.citationKey, exactText: usable[n - 1]!.abstract })) }];
-      });
-      if (claims.length) return { id: uuidv7(), status: 'complete', markdown: claims.map((claim, i) => `${claim.text} [${i + 1}]`).join('\n\n'), claims,
-        limitations: parsed.limitations ?? [], modelProvenance: { provider: 'openai', model: config.openAiModel, validation: 'claims_without_sources_removed' }, createdAt: new Date().toISOString() };
-    }
+import { v7 as uuid } from "uuid";
+import { z } from "zod";
+import type { Answer, Work } from "@vani/shared";
+import { generate } from "./models/router.js";
+export type ConversationSource = {
+  id: string;
+  workId?: string;
+  kind: string;
+  label: string;
+  text: string;
+  url?: string;
+  page?: number;
+  hash?: string;
+};
+const Output = z.object({
+  claims: z
+    .array(
+      z.object({
+        text: z.string().min(2).max(3000),
+        kind: z.enum(["synthesis", "inference", "quotation"]),
+        citations: z
+          .array(
+            z.object({
+              sourceId: z.string(),
+              quote: z.string().min(12).max(1200),
+            }),
+          )
+          .min(1)
+          .max(8),
+      }),
+    )
+    .max(12),
+  limitations: z.array(z.string().max(1500)).max(10),
+});
+export async function answerQuestion(
+  question: string,
+  works: Work[],
+  notes: Array<{ title: string; markdown: string }>,
+  options: {
+    collectionId?: string;
+    sources?: ConversationSource[];
+    history?: unknown[];
+    signal?: AbortSignal;
+    extractive?: boolean;
+  } = {},
+): Promise<Answer> {
+  const sources: ConversationSource[] =
+    options.sources ??
+    works
+      .filter((w) => w.abstract)
+      .slice(0, 12)
+      .map((w) => ({
+        id: w.id,
+        workId: w.id,
+        kind: "abstract",
+        label: w.citationKey,
+        text: w.abstract,
+      }));
+  const base = {
+    id: uuid(),
+    createdAt: new Date().toISOString(),
+    claims: [],
+    limitations: [],
+  };
+  if (!sources.length)
+    return {
+      ...base,
+      status: "insufficient_evidence",
+      markdown:
+        "No usable source evidence is available in this conversation scope.",
+      limitations: ["Add a PDF or abstract to the selected collection."],
+      modelProvenance: { provider: "none" },
+    };
+  if (options.extractive)
+    return {
+      ...base,
+      status: "complete",
+      markdown: "Retrieved excerpts — not a synthesized answer.",
+      claims: sources.slice(0, 6).map((s) => ({
+        id: uuid(),
+        text: s.text.slice(0, 500),
+        supportStatus: "directly_supported" as const,
+        evidence: [
+          {
+            type: s.kind,
+            sourceId: s.workId ?? s.id,
+            label: s.label,
+            exactText: s.text.slice(0, 500),
+          },
+        ],
+      })),
+      limitations: ["Explicit extractive mode; no model synthesis."],
+      modelProvenance: { provider: "extractive-local" },
+    };
+  try {
+    const result = await generate(
+      "Answer the question using only original supplied evidence. Prior turns provide conversational context, not independent evidence. If a reference is ambiguous ask for clarification. Return {claims:[{text,kind:synthesis|inference|quotation,citations:[{sourceId,quote}]}],limitations:[]}. Quote exact source text. Clearly distinguish author statements, your inference, stored VANI decisions and user notes. Missing comparisons must remain unresolved.",
+      { question, history: options.history ?? [], sources },
+      Output,
+      {
+        task: "collection_conversation",
+        collectionId: options.collectionId,
+        privateEvidence: true,
+        signal: options.signal,
+      },
+    );
+    if (
+      result.value.claims.some(
+        (c) =>
+          c.citations.some(
+            (e) =>
+              !sources.some(
+                (s) => s.id === e.sourceId && s.text.includes(e.quote),
+              ),
+          ) ||
+          (c.kind === "quotation" &&
+            !c.citations.some((e) => e.quote === c.text)),
+      )
+    )
+      throw Error("The answer cited unavailable or mismatched evidence.");
+    const claims = result.value.claims.map((c) => ({
+      id: uuid(),
+      text: c.text,
+      supportStatus:
+        c.kind === "quotation"
+          ? ("directly_supported" as const)
+          : c.kind === "inference"
+            ? ("inferred" as const)
+            : ("indirectly_supported" as const),
+      evidence: c.citations.map((e) => {
+        const s = sources.find((s) => s.id === e.sourceId)!;
+        return {
+          type: s.kind,
+          sourceId: s.workId ?? s.id,
+          label: s.label,
+          exactText: e.quote,
+        };
+      }),
+    }));
+    return {
+      ...base,
+      status: claims.length ? "complete" : "insufficient_evidence",
+      markdown:
+        claims.map((c) => c.text).join("\n\n") ||
+        "The supplied evidence does not support an answer.",
+      claims,
+      limitations: [
+        ...result.value.limitations,
+        "Synthesis is limited to the retrieved excerpts; citations are checked against stored text.",
+      ],
+      modelProvenance: {
+        ...result.provenance,
+        scope: "local-only",
+        sourceSnapshot: sources.map((s) => ({
+          id: s.id,
+          workId: s.workId,
+          kind: s.kind,
+          label: s.label,
+          page: s.page,
+          hash: s.hash,
+        })),
+      },
+    };
+  } catch (e) {
+    return {
+      ...base,
+      status: options.signal?.aborted ? "cancelled" : "local_model_unavailable",
+      markdown: options.signal?.aborted
+        ? "Generation cancelled."
+        : "Local synthesis is unavailable or did not pass evidence validation.",
+      limitations: [
+        String(e),
+        "Run the local model health check, retry, or explicitly choose source excerpts. No cloud fallback was used.",
+      ],
+      modelProvenance: { provider: "none", routing: "local-only" },
+    };
   }
-
-  const comparison = /\b(compare|difference|innovation|over|versus|vs\.?|shortcoming|limitation)\b/i.test(question);
-  const selected = usable.slice(0, comparison ? 4 : 6);
-  const claims = selected.map((work): AnswerClaim => ({ id: uuidv7(), text: `${work.title}: ${firstSentence(work.abstract)}`,
-    supportStatus: 'directly_supported', evidence: [{ type: 'paper_abstract', sourceId: work.id, label: work.citationKey, exactText: work.abstract }] }));
-  const noteClaim = notes[0]?.markdown ? { id: uuidv7(), text: `Your note “${notes[0].title}” adds: ${firstSentence(notes[0].markdown)}`,
-    supportStatus: 'directly_supported' as const, evidence: [{ type: 'user_note', sourceId: 'note', label: notes[0].title, exactText: notes[0].markdown }] } : null;
-  if (noteClaim) claims.push(noteClaim);
-  return { id: uuidv7(), status: 'complete', markdown: claims.map((claim, index) => `${claim.text} [${index + 1}]`).join('\n\n'), claims,
-    limitations: ['This local fallback summarizes stored abstracts; configure an LLM provider for structured cross-paper synthesis.', 'Claims are limited to evidence currently stored in VANI.'],
-    modelProvenance: { provider: 'deterministic-local', model: 'extractive-v1', validation: 'direct evidence only' }, createdAt: new Date().toISOString() };
 }

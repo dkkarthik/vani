@@ -1,20 +1,14 @@
-import { runDeepRefresh } from "./deep-refresh.js";
+import { enqueueCore, runCoreWorker, resumeEvidence } from "./core/service.js";
+import { scheduleAudits, runAuditWorker } from "./core/audits.js";
 import { defaultKeywords, keywordMatch } from "./collection-focus.js";
 import { seedFocus } from "./seed-focus.js";
-import { queueEnrichment, runEnrichment } from "./ingestion/enrichment.js";
-import {
-  captureDigest,
-  feedbackFor,
-  retainCandidateSource,
-  refreshWatchedSources,
-} from "./planning/monitor.js";
+import { runEnrichment } from "./ingestion/enrichment.js";
+import { captureDigest, refreshWatchedSources } from "./planning/monitor.js";
 import { z } from "zod";
 import { DiscoverySeed, type CollectionWork, type Work } from "@vani/shared";
 import { pool, query, transaction } from "./db.js";
 import { Repository } from "./repository.js";
-import { discoverCollection } from "./connectors.js";
 import { firstPass, synthesize } from "./first-pass.js";
-import { config } from "./config.js";
 
 // Search by minute in UTC: this handles DST and non-integral UTC offsets without fixed-offset arithmetic.
 export function nextMorning(now: Date, timezone: string, hour: number): Date {
@@ -226,88 +220,38 @@ export function rankRelated(work: Work, others: Work[]) {
 }
 
 export async function runDueCollections(repository: Repository) {
-  const client = await pool.connect();
+  void repository;
+  const db = await pool.connect();
+  let locked = false;
   try {
-    // A session lock prevents overlapping workers, including across server instances. Released on crash.
-    const lock = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock(73421901) AS locked",
-    );
-    if (!lock.rows[0]?.locked) return;
-    const due =
-      await client.query<any>(`SELECT id,discovery,last_discovery_at,keywords,keyword_version FROM collection WHERE deleted_at IS NULL
-      AND discovery->>'enabled'='true' AND next_discovery_at<=now() ORDER BY next_discovery_at`);
-    for (const row of due.rows) {
-      const seed = DiscoverySeed.parse(row.discovery);
+    locked = (await db.query("SELECT pg_try_advisory_lock(73421912) locked"))
+      .rows[0].locked;
+    if (!locked) return;
+    const due = (
+      await db.query(
+        "SELECT id,discovery FROM collection WHERE deleted_at IS NULL AND discovery->>'enabled'='true' AND next_discovery_at<=now()",
+      )
+    ).rows;
+    for (const row of due) {
       try {
+        const seed = DiscoverySeed.parse(row.discovery);
+        await enqueueCore(row.id);
+        await refreshWatchedSources(row.id);
         await captureDigest(row.id);
-        const since = row.last_discovery_at
-          ? new Date(new Date(row.last_discovery_at).getTime() - 90 * 86400000)
-              .toISOString()
-              .slice(0, 10)
-          : undefined;
-        const keywords = row.keywords ?? defaultKeywords(seed.topic);
-        if (!keywords.length) continue;
-        const searchQuery = keywords.join(" ");
-        const result = await discoverCollection(
-          searchQuery,
-          config.openAlexEmail,
-          since,
-        );
-        const filtered = await feedbackFor(
-          result.items,
-          "collection:" + row.id,
-        );
-        for (const candidate of filtered.items) {
-          const match = keywordMatch(
-            keywords,
-            candidate.title,
-            candidate.abstract,
-          );
-          if (match.score < 0.35) continue;
-          const work = await repository.createWork(candidate);
-          await retainCandidateSource(work.id, candidate);
-          await repository.addToCollection(
-            row.id,
-            [work.id],
-            {
-              kind: "automatic",
-              text: `Discovered via ${candidate.connector}: matched ${match.matched.join(", ")} (${match.matched.length}/${keywords.length} active keywords; minimum 35%).`,
-              keywords,
-              query: searchQuery,
-              matched: match.matched,
-              score: match.score,
-              evidence: match.evidence,
-              provider: candidate.connector,
-              at: new Date().toISOString(),
-            },
-            row.keyword_version,
-            JSON.stringify(row.discovery),
-          );
-          await queueEnrichment(work.id);
-        }
-        const sourceChecks = await refreshWatchedSources(row.id);
-        result.warnings.push(...sourceChecks.warnings);
-        await captureDigest(row.id);
-        await reviewMembers(repository, row.id);
         await query(
-          "UPDATE collection SET last_discovery_at=now(),next_discovery_at=$2,discovery_error=$3 WHERE id=$1 AND discovery=$4::jsonb",
-          [
-            row.id,
-            nextMorning(new Date(), seed.timezone, seed.hour),
-            result.warnings.join("; ") || null,
-            JSON.stringify(seed),
-          ],
+          "UPDATE collection SET last_discovery_at=now(),next_discovery_at=$2 WHERE id=$1",
+          [row.id, nextMorning(new Date(), seed.timezone, seed.hour)],
         );
-      } catch (error) {
+      } catch (e) {
         await query(
-          "UPDATE collection SET discovery_error=$2,next_discovery_at=now()+interval '1 hour' WHERE id=$1 AND discovery=$3::jsonb",
-          [row.id, String(error), JSON.stringify(seed)],
+          "UPDATE collection SET next_discovery_at=now()+interval '1 hour',discovery=discovery||jsonb_build_object('lastError',$2::text) WHERE id=$1",
+          [row.id, String(e)],
         );
       }
     }
   } finally {
-    await client.query("SELECT pg_advisory_unlock(73421901)");
-    client.release();
+    if (locked) await db.query("SELECT pg_advisory_unlock(73421912)");
+    db.release();
   }
 }
 
@@ -320,16 +264,19 @@ export function startDiscoveryWorker(
     if (running) return;
     running = true;
     try {
-      await runDeepRefresh(repository);
+      await runCoreWorker();
+      await resumeEvidence();
       await runEnrichment();
       await runDueCollections(repository);
+      await scheduleAudits();
+      await runAuditWorker();
     } catch (error) {
       onError(error);
     } finally {
       running = false;
     }
   };
-  const timer = setInterval(() => void tick(), 60_000);
+  const timer = setInterval(() => void tick(), 2000);
   timer.unref();
   void tick();
   return () => clearInterval(timer);

@@ -1,9 +1,9 @@
 {
   "name": "vani",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "VANI — Visualizing Academic Networks and Ideas",
+  "description": "VANI \u2014 Visualizing Academic Networks and Ideas",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -24,10 +24,14 @@
     "workspace:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/workspace-smoke.mjs",
     "connected:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/connected-smoke.mjs",
     "planning:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/planning-smoke.mjs",
-    "ingestion:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/ingestion-smoke.mjs"
+    "ingestion:smoke": "npm run build -w @vani/shared && npm run build -w @vani/api && node scripts/ingestion-smoke.mjs",
+    "start:local": "python3 scripts/setup/launch.py",
+    "setup:check": "bash scripts/setup-ubuntu.sh --check",
+    "test:setup": "python3 -m unittest discover -s scripts/setup -p 'test_*.py'",
+    "models:smoke": "node scripts/local-model-smoke.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

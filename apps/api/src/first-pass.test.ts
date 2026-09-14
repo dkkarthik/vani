@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { Work } from "@vani/shared";
 vi.mock("./db.js", () => ({ query: async () => ({ rows: [] }) }));
+import { config } from "./config.js";
+import { resetModelIdentity } from "./models/router.js";
 import { firstPass } from "./first-pass.js";
 const work = Work.parse({
   id: "paper1",
@@ -35,17 +37,20 @@ const generated = {
   limitations: [],
 };
 beforeEach(() => {
+  resetModelIdentity();
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          message: { content: JSON.stringify(generated) },
-          choices: [{ message: { content: JSON.stringify(generated) } }],
-        }),
-      }),
+    vi.fn(
+      async (url) =>
+        new Response(
+          JSON.stringify(
+            String(url).endsWith("/api/tags")
+              ? { models: [{ name: config.ollamaModel, digest: "local-test" }] }
+              : { done: true, message: { content: JSON.stringify(generated) } },
+          ),
+          { status: 200 },
+        ),
+    ),
   );
 });
 it("never labels abstract-only evidence as a complete first pass", async () => {

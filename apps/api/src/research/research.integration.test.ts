@@ -458,6 +458,12 @@ it.skipIf(!enabled)(
     await repo.addToCollection(collection.id, [work.id]);
     vi.stubEnv("VANI_EMBED_MODEL", "fixture-" + uuid());
     const fetch = vi.fn(async (_url: any, init: any) => {
+      if (String(_url).endsWith("/api/tags"))
+        return Response.json({
+          models: [
+            { name: process.env.VANI_EMBED_MODEL, digest: "fixture-digest" },
+          ],
+        });
       const body = JSON.parse(init.body);
       return new Response(
         JSON.stringify({

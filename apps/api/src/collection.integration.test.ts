@@ -1,4 +1,10 @@
-import { enrichPaper } from './ingestion/enrichment.js';
+import {
+  enqueueCore,
+  stageCandidate,
+  acceptCandidate,
+} from "./core/service.js";
+import { config } from "./config.js";
+import { enrichPaper } from "./ingestion/enrichment.js";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { DiscoverySeed } from "@vani/shared";
 import { migrate } from "./cli/migrate.js";
@@ -62,6 +68,10 @@ it.skipIf(!enabled)(
           };
         if (String(url).includes("api.crossref.org"))
           return { ok: true, json: async () => ({ message: { items: [] } }) };
+        if (String(url).endsWith("/api/tags"))
+          return Response.json({
+            models: [{ name: config.ollamaModel, digest: "fixture" }],
+          });
         const body = JSON.parse(String(init?.body));
         const evidence = JSON.parse(body.messages[1].content)[0];
         const result = JSON.stringify({
@@ -82,23 +92,36 @@ it.skipIf(!enabled)(
           coverage: ["title", "abstract"],
           limitations: [],
         });
-        return {
-          ok: true,
-          json: async () => ({
-            message: { content: result },
-            choices: [{ message: { content: result } }],
-          }),
-        };
+        return Response.json({ done: true, message: { content: result } });
       }),
     );
     await runDueCollections(repository);
+    const run = await enqueueCore(collection.id);
+    const candidate = await stageCandidate(
+      run,
+      {
+        title: "Active robotic mapping",
+        abstract: "Active robotic mapping uses uncertainty.",
+        connector: "fixture",
+        externalId: "active-mapping",
+        sourcePayload: {},
+      },
+      { channel: "test" },
+    );
+    expect(
+      (await collectionMembers(repository, collection.id)).items,
+    ).toHaveLength(0);
+    await acceptCandidate(candidate.id);
+    await acceptCandidate(candidate.id);
     let members = await collectionMembers(repository, collection.id);
     expect(members.items).toHaveLength(1);
     expect(members.items[0]?.isNew).toBe(true);
     await enrichPaper(members.items[0]!.id);
-    await reviewMembers(repository,collection.id);
-    members=await collectionMembers(repository,collection.id);
-    expect(members.items[0]?.enrichment?.summary?.text).toContain("Active robotic mapping");
+    await reviewMembers(repository, collection.id);
+    members = await collectionMembers(repository, collection.id);
+    expect(members.items[0]?.enrichment?.summary?.text).toContain(
+      "Active robotic mapping",
+    );
     expect(members.items[0]?.firstPass?.status).toBe("abstract_only");
     const id = members.items[0]!.id;
     await repository.addToCollection(other.id, [id]);

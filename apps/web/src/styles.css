@@ -154,3 +154,14 @@
 .card-drag { touch-action:none; border:0; background:#e5eee7; color:#426455; border-radius:4px; font-size:11px; padding:5px 8px; cursor:grab; }
 .board-list li { padding:12px; border-bottom:1px solid var(--line); }
 .candidate-feedback { border-top:1px solid var(--line); margin-top:18px; padding-top:12px; }
+
+/* Collection research engine controls. */
+.core-panel { overflow-wrap: anywhere; }
+.core-panel h2 { font-family: inherit; }
+.core-panel button { margin: 4px 4px 4px 0; }
+.core-panel textarea, .core-panel select, .core-panel input:not([type="checkbox"]) { font: inherit; color: inherit; background: #fff; border: 1px solid #ccdcd5; border-radius: 8px; padding: 8px 10px; max-width: 100%; }
+.core-panel textarea { display: block; min-height: 76px; margin-top: 6px; }
+.core-panel fieldset { border: 1px solid #ccdcd5; border-radius: 10px; padding: 12px 16px; }
+.core-panel fieldset label { margin: 8px 0; }
+.core-panel summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.core-panel pre { background: #f5f8f6; padding: 12px; border-radius: 8px; font-size: 12px; }

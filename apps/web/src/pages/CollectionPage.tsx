@@ -1,3 +1,4 @@
+import { CorePanel } from "../components/CorePanel";
 import { DeepRefresh } from "../components/DeepRefresh";
 import { CollectionKeywords } from "../components/CollectionKeywords";
 import { AddCollectionPaper } from "../components/AddCollectionPaper";
@@ -220,7 +221,10 @@ export function CollectionPage() {
         </section>
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
-        <DeepRefresh key={"refresh:" + collectionId} id={collectionId} />
+        <>
+          <DeepRefresh key={"refresh:" + collectionId} id={collectionId} />
+          <CorePanel key={collectionId} id={collectionId} />
+        </>
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
         <CollectionKeywords

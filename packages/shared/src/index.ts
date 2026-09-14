@@ -1,90 +1,215 @@
-export * from './metadata.js';
-export * from './imports.js';
-import { z } from 'zod';
-export * from './capture.js';
+export * from "./metadata.js";
+export * from "./imports.js";
+import { z } from "zod";
+export * from "./capture.js";
 
-export const WorkStatus = z.enum(['inbox', 'to_read', 'skimming', 'reading', 'read', 'foundational', 'cited', 'rejected', 'archived']);
+export const WorkStatus = z.enum([
+  "inbox",
+  "to_read",
+  "skimming",
+  "reading",
+  "read",
+  "foundational",
+  "cited",
+  "rejected",
+  "archived",
+]);
 export type WorkStatus = z.infer<typeof WorkStatus>;
 
-export const VerificationStatus = z.enum(['unverified', 'partial', 'verified', 'verified_multi_source', 'conflict']);
+export const VerificationStatus = z.enum([
+  "unverified",
+  "partial",
+  "verified",
+  "verified_multi_source",
+  "conflict",
+]);
 export type VerificationStatus = z.infer<typeof VerificationStatus>;
 
-export const Author = z.object({ id: z.string().optional(), given: z.string().default(''), family: z.string(), orcid: z.string().nullable().optional() });
+export const Author = z.object({
+  id: z.string().optional(),
+  given: z.string().default(""),
+  family: z.string(),
+  orcid: z.string().nullable().optional(),
+});
 export type Author = z.infer<typeof Author>;
 
 export const Work = z.object({
   id: z.string(),
   title: z.string(),
-  abstract: z.string().default(''),
+  abstract: z.string().default(""),
   year: z.number().int().nullable(),
-  venue: z.string().default(''),
-  venueAbbreviation: z.string().default('misc'),
+  venue: z.string().default(""),
+  venueAbbreviation: z.string().default("misc"),
   doi: z.string().nullable(),
   citationKey: z.string(),
   authors: z.array(Author),
-  publisher: z.string().default(''),
-  publicationPlace: z.string().default(''),
-  publicationDate: z.string().default(''),
-  volume: z.string().default(''),
-  issue: z.string().default(''),
-  pages: z.string().default(''),
-  affiliations: z.array(z.object({ name: z.string(), place: z.string().default('') })).default([]),
-  salientContribution: z.string().default(''),
-  recordKind: z.enum(['scholarly_record', 'demo_fixture']).default('scholarly_record'),
+  publisher: z.string().default(""),
+  publicationPlace: z.string().default(""),
+  publicationDate: z.string().default(""),
+  volume: z.string().default(""),
+  issue: z.string().default(""),
+  pages: z.string().default(""),
+  affiliations: z
+    .array(z.object({ name: z.string(), place: z.string().default("") }))
+    .default([]),
+  salientContribution: z.string().default(""),
+  recordKind: z
+    .enum(["scholarly_record", "demo_fixture"])
+    .default("scholarly_record"),
   verificationStatus: VerificationStatus,
-  manifestationType: z.string().default('version_of_record'),
-  accessClass: z.string().default('metadata_only'),
+  manifestationType: z.string().default("version_of_record"),
+  accessClass: z.string().default("metadata_only"),
   version: z.number().int().default(1),
-  publicationType: z.string().default('article-journal'),
+  publicationType: z.string().default("article-journal"),
   editors: z.array(Author).default([]),
-  edition: z.string().default(''), isbn: z.string().default(''), issn: z.string().default(''),
-  url: z.string().default(''), language: z.string().default(''), articleNumber: z.string().default(''),
-  onlineDate: z.string().default(''), printDate: z.string().default(''),
+  edition: z.string().default(""),
+  isbn: z.string().default(""),
+  issn: z.string().default(""),
+  url: z.string().default(""),
+  language: z.string().default(""),
+  articleNumber: z.string().default(""),
+  onlineDate: z.string().default(""),
+  printDate: z.string().default(""),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
 });
 export type Work = z.infer<typeof Work>;
 
-export const DiscoverySeed = z.object({
-  topicSource: z.enum(['manual','model','extractive','needs_focus']).optional(), topicNotice: z.string().max(1000).optional(),
-  mode: z.enum(['topic', 'papers']), topic: z.string().trim().max(500).default(''),
-  workIds: z.array(z.string().uuid()).max(10).default([]),
-  timezone: z.string().default('America/New_York').refine(value => {
-    try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; }
-  }, 'Use an IANA timezone'),
-  hour: z.number().int().min(0).max(23).default(7), enabled: z.boolean().default(true)
-}).refine(value => value.mode === 'topic' ? value.topic.length >= 2 : value.workIds.length > 0,
-  'Provide a topic or at least one seed paper');
+export const DiscoverySeed = z
+  .object({
+    topicSource: z
+      .enum(["manual", "model", "extractive", "needs_focus"])
+      .optional(),
+    topicNotice: z.string().max(1000).optional(),
+    mode: z.enum(["topic", "papers"]),
+    topic: z.string().trim().max(500).default(""),
+    workIds: z.array(z.string().uuid()).max(10).default([]),
+    timezone: z
+      .string()
+      .default("America/New_York")
+      .refine((value) => {
+        try {
+          new Intl.DateTimeFormat("en", { timeZone: value });
+          return true;
+        } catch {
+          return false;
+        }
+      }, "Use an IANA timezone"),
+    hour: z.number().int().min(0).max(23).default(7),
+    enabled: z.boolean().default(true),
+  })
+  .refine(
+    (value) =>
+      value.mode === "topic"
+        ? value.topic.length >= 2
+        : value.workIds.length > 0,
+    "Provide a topic or at least one seed paper",
+  );
 export type DiscoverySeed = z.infer<typeof DiscoverySeed>;
 export interface FirstPass {
-  status: 'full_text' | 'partial_full_text' | 'abstract_only' | 'needs_evidence' | 'needs_model';
-  category: string; context: string; correctness: string; contributions: string; clarity: string;
-  novelty: string; comparedWorkIds: string[];
+  status:
+    | "full_text"
+    | "partial_full_text"
+    | "abstract_only"
+    | "needs_evidence"
+    | "needs_model";
+  category: string;
+  context: string;
+  correctness: string;
+  contributions: string;
+  clarity: string;
+  novelty: string;
+  comparedWorkIds: string[];
   evidence: Array<{ workId: string; section: string; quote: string }>;
-  coverage: string[]; limitations: string[]; provider: string; createdAt: string;
+  coverage: string[];
+  limitations: string[];
+  provider: string;
+  createdAt: string;
 }
-export type CollectionWork = Work & { isNew: boolean; status: WorkStatus; firstPass?: FirstPass; inclusionReason?: {kind:string;text:string;keywords?:string[];matched?:string[];query?:string;provider?:string;evidence?:Array<{keyword:string;field:string;quote:string}>}; currentKeywordMatches?:string[]; enrichment?: {pdf_status:string;pdf_error:string;status:string;summary?:{status:string;text:string;coverage:string;provider:string;evidence:Array<{quote:string;label:string;page?:number;attachmentId?:string}>;limitations?:string[]}} };
+export type CollectionWork = Work & {
+  isNew: boolean;
+  status: WorkStatus;
+  firstPass?: FirstPass;
+  inclusionReason?: {
+    kind: string;
+    text: string;
+    candidateId?: string;
+    focusVersion?: number;
+    proximity?: string;
+    role?: string;
+    assessment?: Record<string, unknown>;
+    keywords?: string[];
+    matched?: string[];
+    query?: string;
+    provider?: string;
+    evidence?: Array<{ keyword: string; field: string; quote: string }>;
+  };
+  currentKeywordMatches?: string[];
+  enrichment?: {
+    pdf_status: string;
+    pdf_error: string;
+    status: string;
+    summary?: {
+      status: string;
+      text: string;
+      coverage: string;
+      provider: string;
+      evidence: Array<{
+        quote: string;
+        label: string;
+        page?: number;
+        attachmentId?: string;
+      }>;
+      limitations?: string[];
+    };
+  };
+};
 
 export const Collection = z.object({
-  id: z.string(), name: z.string(), description: z.string().default(''),
+  id: z.string(),
+  name: z.string(),
+  description: z.string().default(""),
   collectionType: z.string().optional(),
-  parentId: z.string().nullable(), memberCount: z.number().int().default(0),
-  newCount: z.number().int().optional(), discovery: DiscoverySeed.nullable().optional(),
-  nextDiscoveryAt: z.string().nullable().optional(), lastDiscoveryAt: z.string().nullable().optional(), discoveryError: z.string().nullable().optional(),
-  createdAt: z.string(), updatedAt: z.string()
+  parentId: z.string().nullable(),
+  memberCount: z.number().int().default(0),
+  newCount: z.number().int().optional(),
+  discovery: DiscoverySeed.nullable().optional(),
+  nextDiscoveryAt: z.string().nullable().optional(),
+  lastDiscoveryAt: z.string().nullable().optional(),
+  discoveryError: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 export type Collection = z.infer<typeof Collection>;
 
 export const RelationshipPredicate = z.enum([
-  'semantically_similar', 'cites', 'cited_by', 'co_cited', 'bibliographic_coupling',
-  'uses_as_baseline', 'compares_against', 'evaluates_on', 'uses_method', 'extends', 'contradicts'
+  "semantically_similar",
+  "cites",
+  "cited_by",
+  "co_cited",
+  "bibliographic_coupling",
+  "uses_as_baseline",
+  "compares_against",
+  "evaluates_on",
+  "uses_method",
+  "extends",
+  "contradicts",
 ]);
 export type RelationshipPredicate = z.infer<typeof RelationshipPredicate>;
 
 export interface Relationship {
-  id: string; sourceId: string; targetId: string; predicate: RelationshipPredicate;
-  confidence: number; verificationStatus: 'inferred' | 'verified' | 'rejected';
-  evidence?: { exactText: string; page?: number; section?: string; passageId?: string }[];
+  id: string;
+  sourceId: string;
+  targetId: string;
+  predicate: RelationshipPredicate;
+  confidence: number;
+  verificationStatus: "inferred" | "verified" | "rejected";
+  evidence?: {
+    exactText: string;
+    page?: number;
+    section?: string;
+    passageId?: string;
+  }[];
 }
 
 export interface SearchResult {
@@ -96,31 +221,73 @@ export interface SearchResult {
 }
 
 export interface GraphProjection {
-  nodes: Array<{ id: string; label: string; year: number | null; venue: string; gist: string; status?: WorkStatus; cluster?: string }>;
+  nodes: Array<{
+    id: string;
+    label: string;
+    year: number | null;
+    venue: string;
+    gist: string;
+    status?: WorkStatus;
+    cluster?: string;
+  }>;
   edges: Relationship[];
   truncated: boolean;
 }
 
 export interface AnswerClaim {
-  id: string; text: string; supportStatus: 'directly_supported' | 'indirectly_supported' | 'unsupported' | 'inferred';
-  evidence: Array<{ type: string; sourceId: string; label: string; exactText?: string }>;
+  id: string;
+  text: string;
+  supportStatus:
+    "directly_supported" | "indirectly_supported" | "unsupported" | "inferred";
+  evidence: Array<{
+    type: string;
+    sourceId: string;
+    label: string;
+    exactText?: string;
+  }>;
 }
 
 export interface Answer {
-  id: string; status: 'complete' | 'insufficient_evidence'; markdown: string;
-  claims: AnswerClaim[]; limitations: string[];
-  modelProvenance: Record<string, unknown>; createdAt: string;
+  id: string;
+  status:
+    | "complete"
+    | "insufficient_evidence"
+    | "local_model_unavailable"
+    | "cancelled";
+  markdown: string;
+  claims: AnswerClaim[];
+  limitations: string[];
+  modelProvenance: Record<string, unknown>;
+  createdAt: string;
 }
 
-export interface Job { id: string; type: string; state: string; progress: number; result?: unknown; error?: string; createdAt: string; updatedAt: string }
+export interface Job {
+  id: string;
+  type: string;
+  state: string;
+  progress: number;
+  result?: unknown;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export const citationKey = (family: string, venue: string, year: number, suffix = '') => {
-  const author = family.normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase() || 'anon';
-  const abbreviation = venue.toLowerCase().replace(/[^a-z0-9]/g, '') || 'misc';
+export const citationKey = (
+  family: string,
+  venue: string,
+  year: number,
+  suffix = "",
+) => {
+  const author =
+    family
+      .normalize("NFKD")
+      .replace(/[^\p{L}\p{N}]+/gu, "")
+      .toLowerCase() || "anon";
+  const abbreviation = venue.toLowerCase().replace(/[^a-z0-9]/g, "") || "misc";
   return `${author}-${abbreviation}${String(year).slice(-2)}${suffix}`;
 };
 
-export * from './research.js';
+export * from "./research.js";
 
-export * from './knowledge.js';
-export * from './maps.js';
+export * from "./knowledge.js";
+export * from "./maps.js";

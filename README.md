@@ -1,22 +1,31 @@
-# VANI 0.1 Build Package
+# VANI 1.0
 
 **VANI — Visualizing Academic Networks and Ideas**  
 **Tagline:** See how ideas connect.
 
-This repository contains the frozen product and technical specification for VANI 0.1. VANI is a local-first research environment that continuously discovers scholarly work, verifies bibliographic records, stores papers and annotations, extracts evidence-backed relationships, visualizes academic networks, and supports grounded conversation over a research collection.
+VANI 1.0 implements the local-model research engine and preserves the earlier workspace features. VANI is a local-first research environment that continuously discovers scholarly work, verifies bibliographic records, stores papers and annotations, extracts evidence-backed relationships, visualizes academic networks, and supports grounded conversation over a research collection.
 
 The repository also contains the working VANI application: a React interface, Fastify API, PostgreSQL/pgvector data layer, immutable object store, scholarly connectors, evidence map, and grounded collection conversation.
 
 ## Run VANI
+
+### Ubuntu desktop with local models
+
+```bash
+bash scripts/setup-ubuntu.sh --dry-run --profile local-5090
+bash scripts/setup-ubuntu.sh --install --profile local-5090
+```
+
+Open `http://127.0.0.1:3000`. See the [VANI 1.0 installation and operations guide](docs/23-vani-1.0.md) for dependency checks, upgrades, calibration, local conversations and target-hardware acceptance.
 
 ### Local development
 
 Requirements: Node.js 22+, Docker, and Docker Compose.
 
 ```bash
-cp .env.example .env
+cp -n .env.example .env
 docker compose up -d postgres
-npm install
+npm ci
 npm run db:migrate
 npm run db:seed
 npm run dev
@@ -24,7 +33,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. The API listens on `http://127.0.0.1:8080`.
 
-### Container deployment
+### Legacy container deployment (workspace only)
 
 ```bash
 docker compose up --build
@@ -78,20 +87,20 @@ Researchers currently move between discovery maps, publisher sites, reference ma
 
 ## Package map
 
-| Document | Purpose |
-|---|---|
-| [Product requirements](docs/01-product-requirements.md) | Scope, users, workflows, functional and non-functional requirements |
-| [System architecture](docs/02-system-architecture.md) | Components, data flows, deployment, storage, security, and operational design |
-| [Data model](docs/03-data-model.md) | Canonical entities, provenance, versioning, notes, annotations, and collections |
-| [Source connectors](docs/04-source-connectors.md) | Initial scholarly sources, connector contract, licensing, and ingestion behavior |
-| [Citation verification](docs/05-citation-verification.md) | Authority hierarchy, field verification, citation keys, and exports |
-| [Relationship ontology](docs/06-relationship-ontology.md) | VANI 0.1 relationship vocabulary and evidence requirements |
-| [API specification](docs/07-api-specification.md) | Application API resources, jobs, events, errors, and permissions |
-| [UX specification](docs/08-ux-specification.md) | Navigation, primary screens, interaction rules, and wireframes |
-| [Evaluation plan](docs/09-evaluation-plan.md) | Corpus, metrics, algorithm evaluation, and release gates |
-| [Implementation backlog](docs/10-implementation-backlog.md) | Milestones, epics, dependency order, and deferred work |
-| [Acceptance tests](docs/11-acceptance-tests.md) | End-to-end, reliability, provenance, export, and performance criteria |
-| [Decisions and open questions](docs/12-decisions-and-open-questions.md) | Frozen defaults and decisions still requiring implementation validation |
+| Document                                                                | Purpose                                                                          |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [Product requirements](docs/01-product-requirements.md)                 | Scope, users, workflows, functional and non-functional requirements              |
+| [System architecture](docs/02-system-architecture.md)                   | Components, data flows, deployment, storage, security, and operational design    |
+| [Data model](docs/03-data-model.md)                                     | Canonical entities, provenance, versioning, notes, annotations, and collections  |
+| [Source connectors](docs/04-source-connectors.md)                       | Initial scholarly sources, connector contract, licensing, and ingestion behavior |
+| [Citation verification](docs/05-citation-verification.md)               | Authority hierarchy, field verification, citation keys, and exports              |
+| [Relationship ontology](docs/06-relationship-ontology.md)               | VANI 0.1 relationship vocabulary and evidence requirements                       |
+| [API specification](docs/07-api-specification.md)                       | Application API resources, jobs, events, errors, and permissions                 |
+| [UX specification](docs/08-ux-specification.md)                         | Navigation, primary screens, interaction rules, and wireframes                   |
+| [Evaluation plan](docs/09-evaluation-plan.md)                           | Corpus, metrics, algorithm evaluation, and release gates                         |
+| [Implementation backlog](docs/10-implementation-backlog.md)             | Milestones, epics, dependency order, and deferred work                           |
+| [Acceptance tests](docs/11-acceptance-tests.md)                         | End-to-end, reliability, provenance, export, and performance criteria            |
+| [Decisions and open questions](docs/12-decisions-and-open-questions.md) | Frozen defaults and decisions still requiring implementation validation          |
 
 Machine-readable contracts:
 

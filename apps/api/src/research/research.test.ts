@@ -98,22 +98,27 @@ it("ranks exact phrases and real semantic similarities without invented semantic
 });
 it("uses configured embedding vectors and rejects malformed provider output", async () => {
   vi.stubEnv("VANI_EMBED_MODEL", "fixture-model");
-  const fetch = vi.fn().mockResolvedValue(
-    new Response(
-      JSON.stringify({
-        embeddings: [
-          [1, 0],
-          [0, 1],
-        ],
-      }),
-    ),
-  );
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ models: [{ name: "fixture-model", digest: "fixture" }] }),
+    )
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          embeddings: [
+            [1, 0],
+            [0, 1],
+          ],
+        }),
+      ),
+    );
   vi.stubGlobal("fetch", fetch);
   expect(await embed(["one", "two"])).toEqual([
     [1, 0],
     [0, 1],
   ]);
-  expect(JSON.parse(fetch.mock.calls[0]![1].body).input).toEqual([
+  expect(JSON.parse(fetch.mock.calls[1]![1].body).input).toEqual([
     "one",
     "two",
   ]);

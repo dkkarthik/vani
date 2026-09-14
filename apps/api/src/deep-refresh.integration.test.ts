@@ -3,36 +3,44 @@ import { v7 as uuid } from "uuid";
 import { pool } from "./db.js";
 import { migrate } from "./cli/migrate.js";
 import { Repository } from "./repository.js";
+import { configureCollection } from "./collection-discovery.js";
+import { enqueueDeepRefresh } from "./deep-refresh.js";
 import {
-  configureCollection,
-  collectionMembers,
-} from "./collection-discovery.js";
-const mock = vi.hoisted(() => ({ discover: vi.fn(), expand: vi.fn() }));
-vi.mock("./connectors.js", async (original) => ({
-  ...(await original<any>()),
-  discoverCollection: mock.discover,
-}));
-vi.mock("./knowledge/discovery.js", async (original) => ({
-  ...(await original<any>()),
-  runDiscovery: mock.expand,
-}));
-import { candidateIdentity, materialFingerprint } from "./planning/monitor.js";
-import { enqueueDeepRefresh, runDeepRefresh } from "./deep-refresh.js";
+  stageCandidate,
+  acceptCandidate,
+  getFocus,
+  saveFocus,
+  runCoreWorker,
+} from "./core/service.js";
+import { enqueueAudit } from "./core/audits.js";
+import { Focus } from "./core/algorithm.js";
 const enabled = process.env.VANI_INTEGRATION_TEST === "true",
   repo = new Repository();
 beforeAll(async () => {
   if (enabled) await migrate();
 });
-beforeEach(() => {
-  vi.resetAllMocks();
-  mock.expand.mockResolvedValue({ items: [], coverage: [{ state: "ok" }] });
-  mock.discover.mockResolvedValue({ items: [], warnings: [] });
+beforeEach(async () => {
+  if (enabled)
+    await pool.query(
+      "UPDATE core_run SET status='superseded' WHERE status IN ('queued','running','paused')",
+    );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url) =>
+      Response.json(
+        String(url).includes("crossref")
+          ? { message: { items: [] } }
+          : { results: [], meta: {} },
+      ),
+    ),
+  );
 });
 afterAll(async () => {
+  vi.unstubAllGlobals();
   if (enabled) await pool.end();
 });
 async function collection() {
-  const c = await repo.createCollection({ name: "Deep refresh " + uuid() });
+  const c = await repo.createCollection({ name: "Core refresh " + uuid() });
   await configureCollection(repo, c.id, {
     mode: "topic",
     topic: "robotic mapping",
@@ -44,12 +52,10 @@ async function collection() {
   return c;
 }
 async function state(id: string) {
-  return (
-    await pool.query("SELECT * FROM collection_refresh WHERE id=$1", [id])
-  ).rows[0];
+  return (await pool.query("SELECT * FROM core_run WHERE id=$1", [id])).rows[0];
 }
 it.skipIf(!enabled)(
-  "manual deep search updates a paused collection without changing its daily schedule",
+  "coalesces manual refreshes and preserves the daily schedule; membership requires admission",
   async () => {
     const c = await collection(),
       before = (
@@ -58,42 +64,23 @@ it.skipIf(!enabled)(
           [c.id],
         )
       ).rows[0],
-      key = uuid();
-    mock.discover.mockResolvedValue({
-      items: [
-        {
-          title: "Robotic mapping " + key,
-          abstract: "Mapping robots through uncertainty.",
-          year: 1990,
-          connector: "fixture",
-          externalId: key,
-          sourcePayload: {},
-        },
-        {
-          title: "Medieval pottery " + key,
-          connector: "fixture",
-          externalId: key + "x",
-          sourcePayload: {},
-        },
-      ],
-      warnings: [],
-    });
-    const job = await enqueueDeepRefresh(c.id);
+      job = await enqueueDeepRefresh(c.id);
     expect((await enqueueDeepRefresh(c.id)).id).toBe(job.id);
-    await runDeepRefresh(repo);
-    const done = await state(job.id);
-    expect(done.status).toBe("completed");
-    expect(done.added).toBe(1);
-    expect(done.scanned).toBe(2);
-    expect(mock.discover.mock.calls.map((c) => c[0])).toEqual([
-      "robotic mapping",
-      "robotic",
-      "mapping",
-    ]);
-    expect(mock.discover.mock.calls.every((c) => c.length === 2)).toBe(true);
-    const members = await collectionMembers(repo, c.id);
-    expect(members.items[0]?.inclusionReason?.text).toContain("Deep refresh");
-    expect(members.items[0]?.enrichment?.status).toBe("queued");
+    const paper = {
+      title: "Mapping " + uuid(),
+      abstract: "We introduce active uncertainty-aware mapping.",
+      connector: "fixture",
+      externalId: uuid(),
+      sourcePayload: {},
+    };
+    const first = await stageCandidate(job, paper, { channel: "lexical" }),
+      again = await stageCandidate(job, paper, { channel: "citation" });
+    expect(first.id).toBe(again.id);
+    expect(again.paths).toHaveLength(2);
+    expect(await repo.listWorks({ collectionId: c.id })).toHaveLength(0);
+    await acceptCandidate(first.id);
+    await acceptCandidate(first.id);
+    expect(await repo.listWorks({ collectionId: c.id })).toHaveLength(1);
     expect(
       (
         await pool.query(
@@ -102,115 +89,131 @@ it.skipIf(!enabled)(
         )
       ).rows[0],
     ).toEqual(before);
-    const again = await enqueueDeepRefresh(c.id);
-    await runDeepRefresh(repo);
-    expect((await state(again.id)).added).toBe(0);
   },
 );
-it.skipIf(!enabled)("rejects a deep refresh without keywords", async () => {
-  const c = await collection();
-  await pool.query(
-    "UPDATE collection SET keywords=ARRAY[]::text[] WHERE id=$1",
-    [c.id],
-  );
-  await expect(enqueueDeepRefresh(c.id)).rejects.toMatchObject({
-    statusCode: 409,
-  });
-});
 it.skipIf(!enabled)(
-  "an edit during provider search supersedes results before admission",
+  "rejects discovery without public queries or anchors",
   async () => {
     const c = await collection();
-    mock.discover.mockImplementation(async () => {
-      await pool.query(
-        "UPDATE collection SET keywords=ARRAY['navigation'],keyword_version=keyword_version+1 WHERE id=$1",
-        [c.id],
-      );
-      return {
-        items: [
-          {
-            title: "Robotic mapping " + uuid(),
-            connector: "fixture",
-            externalId: uuid(),
-            sourcePayload: {},
-          },
-        ],
-        warnings: [],
-      };
+    await pool.query(
+      "UPDATE collection SET keywords=ARRAY[]::text[] WHERE id=$1",
+      [c.id],
+    );
+    await expect(enqueueDeepRefresh(c.id)).rejects.toMatchObject({
+      statusCode: 409,
     });
-    const job = await enqueueDeepRefresh(c.id);
-    await runDeepRefresh(repo);
+  },
+);
+it.skipIf(!enabled)(
+  "supersedes in-flight results and prevents stale admission after a keyword change",
+  async () => {
+    const c = await collection(),
+      job = await enqueueDeepRefresh(c.id),
+      candidate = await stageCandidate(
+        job,
+        {
+          title: "Robotic mapping",
+          connector: "fixture",
+          externalId: uuid(),
+          sourcePayload: {},
+        },
+        { channel: "search" },
+      );
+    await pool.query(
+      "UPDATE collection SET keywords=ARRAY['navigation'],keyword_version=keyword_version+1 WHERE id=$1",
+      [c.id],
+    );
     expect((await state(job.id)).status).toBe("superseded");
+    await expect(acceptCandidate(candidate.id)).rejects.toMatchObject({
+      statusCode: 409,
+    });
     expect(await repo.listWorks({ collectionId: c.id })).toHaveLength(0);
   },
 );
 it.skipIf(!enabled)(
-  "provider outage is a failed job and a later refresh can retry",
-  async () => {
-    const c = await collection();
-    mock.discover.mockRejectedValue(Error("providers offline"));
-    const job = await enqueueDeepRefresh(c.id);
-    await runDeepRefresh(repo);
-    expect((await state(job.id)).status).toBe("failed");
-    mock.discover.mockResolvedValue({ items: [], warnings: [] });
-    const retry = await enqueueDeepRefresh(c.id);
-    await runDeepRefresh(repo);
-    expect((await state(retry.id)).status).toBe("completed");
-  },
-);
-it.skipIf(!enabled)(
-  "recovers an interrupted job and preserves provider warnings",
+  "retains failed source checkpoints and resumes the same job after an outage",
   async () => {
     const c = await collection(),
       job = await enqueueDeepRefresh(c.id);
-    await pool.query(
-      "UPDATE collection_refresh SET status='running',phase='searching' WHERE id=$1",
-      [job.id],
+    vi.mocked(fetch).mockRejectedValue(Error("providers offline"));
+    for (let i = 0; i < 20 && (await state(job.id)).status !== "paused"; i++)
+      await runCoreWorker();
+    expect((await state(job.id)).status).toBe("paused");
+    expect((await state(job.id)).coverage.length).toBeGreaterThan(0);
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({ results: [], meta: {}, message: { items: [] } }),
     );
-    mock.discover.mockResolvedValue({
-      items: [],
-      warnings: ["Crossref unavailable; OpenAlex returned results"],
-    });
-    await runDeepRefresh(repo);
-    expect((await state(job.id)).status).toBe("partial");
-    expect((await state(job.id)).warnings).toHaveLength(1);
+    expect((await enqueueDeepRefresh(c.id)).id).toBe(job.id);
+    await runCoreWorker();
+    expect((await state(job.id)).status).toBe("running");
   },
 );
 it.skipIf(!enabled)(
-  "expands public seeds and applies collection feedback to candidates",
+  "uses only explicit public anchors for expansion",
   async () => {
     const c = await collection(),
       w = await repo.createWork({
-        title: "Public seed " + uuid(),
+        title: "Public paper " + uuid(),
         doi: "10.1234/" + uuid(),
       });
     await repo.addToCollection(c.id, [w.id]);
-    const dismissed = {
-      title: "Robotic mapping " + uuid(),
-      connector: "fixture",
-      externalId: uuid(),
-      sourcePayload: {},
-    };
-    await pool.query(
-      "INSERT INTO discovery_feedback(id,context_key,identity_key,fingerprint,state,reason) VALUES($1,$2,$3,$4,'dismissed','Off topic')",
-      [
-        uuid(),
-        "collection:" + c.id,
-        candidateIdentity(dismissed),
-        materialFingerprint(dismissed),
-      ],
+    const focus = await getFocus(c.id);
+    expect(focus.profile.anchors).toEqual([]);
+    await saveFocus(
+      c.id,
+      focus.version,
+      Focus.parse({ ...focus.profile, anchors: [{ workId: w.id }] }),
     );
-    mock.discover.mockResolvedValue({ items: [dismissed], warnings: [] });
     const job = await enqueueDeepRefresh(c.id);
-    await runDeepRefresh(repo);
-    expect(await repo.listWorks({ collectionId: c.id })).toHaveLength(1);
-    expect(mock.expand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        seeds: [w.id],
-        direction: "both",
-        collectionId: c.id,
-      }),
+    expect(
+      job.frontier.some((t: any) => t.source === "anchor" && t.query === w.doi),
+    ).toBe(true);
+  },
+);
+it.skipIf(!enabled)(
+  "early audits freeze all retained candidates, including those promoted to D3",
+  async () => {
+    const c = await collection(),
+      job = await enqueueDeepRefresh(c.id),
+      a = await stageCandidate(
+        job,
+        {
+          title: "Candidate A",
+          connector: "fixture",
+          externalId: uuid(),
+          sourcePayload: {},
+        },
+        { channel: "search" },
+      ),
+      b = await stageCandidate(
+        job,
+        {
+          title: "Candidate B",
+          connector: "fixture",
+          externalId: uuid(),
+          sourcePayload: {},
+        },
+        { channel: "search" },
+      );
+    await pool.query(
+      "UPDATE core_candidate SET stage='D3',proximity='closest' WHERE id=$1",
+      [b.id],
     );
-    expect((await state(job.id)).status).toBe("completed");
+    const audit = await enqueueAudit(c.id, "early");
+    const items = (
+      await pool.query("SELECT * FROM core_audit_item WHERE audit_id=$1", [
+        audit.id,
+      ])
+    ).rows;
+    expect(new Set(items.map((i) => i.candidate_id))).toEqual(
+      new Set([a.id, b.id]),
+    );
+    await pool.query(
+      "UPDATE core_candidate SET proximity='background' WHERE id=$1",
+      [b.id],
+    );
+    expect(items.find((i) => i.candidate_id === b.id)!.snapshot.proximity).toBe(
+      "closest",
+    );
   },
 );
