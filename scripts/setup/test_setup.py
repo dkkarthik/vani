@@ -93,6 +93,32 @@ class SetupTests(unittest.TestCase):
   self.assertEqual(package_call[0],['npm','ci','--include=dev'])
   self.assertEqual(package_call[1]['env']['NODE_ENV'],'production')
   self.assertEqual(calls[-1][0],[str(self.state/'bin/vani'),'start'])
+ def test_custom_directory_drives_all_managed_paths(self):
+  target=(self.base/'external disk/VANI library').resolve()
+  u.select_install_dir(str(target))
+  self.assertEqual(u.STATE,target.resolve());self.assertEqual(u.APP,target/'app')
+  settings=u.configure(self.args());self.assertEqual(settings['VANI_DATA_DIR'],str(target/'data'))
+  self.assertEqual(u.runtime_env()['OLLAMA_MODELS'],str(target/'models'))
+  self.assertEqual(u.runtime_env()['TMPDIR'],str(target/'tmp'))
+  self.assertNotIn('~/vani',' '.join(u.plan(self.args())))
+ def test_cli_custom_directory_check_does_not_create_it(self):
+  target=self.base/'outside home/custom'
+  with patch.object(u,'report',return_value={'supported':True,'ready':False,'checks':[]}),contextlib.redirect_stdout(io.StringIO()):
+   self.assertEqual(u.main(['--check','--install-dir',str(target)]),2)
+  self.assertEqual(u.STATE,target.resolve());self.assertFalse(target.exists())
+ def test_reject_unsafe_install_roots(self):
+  file=self.base/'file';file.touch();link=self.base/'link';link.symlink_to(self.root)
+  for path in ('', '/', str(pathlib.Path.home()), str(file), str(link), 'bad\npath'):
+   with self.subTest(path=path),self.assertRaises(ValueError):u.select_install_dir(path)
+ def test_installed_helpers_infer_custom_root_without_flags(self):
+  import subprocess,sys,shutil
+  target=(self.base/'external disk/VANI library').resolve();setup=target/'app/scripts/setup';setup.mkdir(parents=True)
+  (target/'app/.vani-owned').write_text('rootless-v1')
+  source=pathlib.Path(__file__).resolve().parent
+  for name in ('ubuntu.py','control.py','launch.py','dependencies.json'):shutil.copy2(source/name,setup/name)
+  code="import ubuntu,control,launch,json;print(json.dumps([str(ubuntu.STATE),str(control.STATE),str(launch.STATE)]))"
+  result=subprocess.check_output([sys.executable,'-B','-c',code],cwd=setup,text=True)
+  self.assertEqual(json.loads(result),[str(target)]*3)
  def test_no_privileged_or_system_service_commands(self):
   import ast
   for name in ('ubuntu.py','control.py','launch.py'):

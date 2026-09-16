@@ -17,6 +17,8 @@ bash scripts/setup-ubuntu.sh --dry-run --profile local-5090
 bash scripts/setup-ubuntu.sh --install --profile local-5090
 ```
 
+Use `--install-dir /path/to/vani` on check/install/resume commands to choose a different writable installation directory.
+
 No root, sudo or Docker is needed. Missing dependencies are reported first; the application, database, PDFs, models and caches are installed under `~/vani`. Use `~/vani/bin/vani start|stop|status` to control it. A working NVIDIA driver must already be installed by your administrator.
 
 Open `http://127.0.0.1:3000`. See the [VANI 1.0 installation and operations guide](docs/23-vani-1.0.md) for dependency checks, upgrades, calibration, local conversations and target-hardware acceptance.

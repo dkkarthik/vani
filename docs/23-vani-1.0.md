@@ -135,3 +135,27 @@ Before relying on the school desktop unattended, run setup check and `npm run mo
 - A real temporary PostgreSQL 18 cluster passed initdb, SCRAM authentication, vector/pg_trgm loading, migration, second-run backup preservation and clean shutdown. This used native macOS PostgreSQL, not the Ubuntu binaries.
 - The Linux package set resolved successfully with Ubuntu 22.04 kernel/glibc metadata (90 packages). The standalone Conda archive checksum and executable layout were verified. This verifies package resolution and archive structure, not execution of the Linux installer.
 - Python compilation, shell syntax and repository lint passed. End-to-end Ubuntu/5090 installation remains target-machine acceptance work.
+
+### Install outside your home directory
+
+Supply `--install-dir` for a dedicated folder you can write to, without sudo:
+
+```bash
+bash scripts/setup-ubuntu.sh --check --profile local-5090 --install-dir /mnt/research/vani
+bash scripts/setup-ubuntu.sh --install --profile local-5090 --install-dir /mnt/research/vani
+/mnt/research/vani/bin/vani status
+```
+
+All application files, data, models, caches, configuration, logs and backups use
+that directory instead of `~/vani`. Quote paths containing spaces. Relative paths
+are resolved from your current directory; `~` is supported. Check/dry-run remain
+read-only and report the selected absolute path and its disk space.
+
+Repeat `--install-dir /mnt/research/vani` when resuming or upgrading from your Git
+checkout. Installed start/stop/status commands and the foreground launcher infer
+their location automatically. Omitting the option from a source checkout still
+selects `~/vani`. The directory must be writable by your account; setup never
+uses sudo to change that. Choosing another folder does not move your existing
+library. Do not move an installed runtime manually; its configuration and package
+prefixes contain absolute paths. Only one installation can use the default ports
+at a time.

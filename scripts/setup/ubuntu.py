@@ -4,10 +4,25 @@ import argparse, datetime, fcntl, hashlib, json, os, pathlib, platform, secrets,
 from urllib.parse import urlparse, unquote
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MANIFEST = json.loads((ROOT / 'scripts/setup/dependencies.json').read_text())
-STATE = pathlib.Path.home() / 'vani'
+# Installed helpers recover their root from the owned application snapshot.
+STATE = ROOT.parent if ROOT.name == 'app' and (ROOT/'.vani-owned').is_file() else pathlib.Path.home() / 'vani'
 APP = STATE / 'app'
 CONFIG = STATE / 'config/vani.env'
 PREFIX = STATE / 'runtime/deps'
+
+
+def select_install_dir(value):
+    """Choose one absolute installation root before checking or writing anything."""
+    global STATE, APP, CONFIG, PREFIX
+    if not value.strip() or any(c in value for c in ('\n', '\r', '\0')):
+        raise ValueError('--install-dir must be a nonempty directory path without line breaks.')
+    path=pathlib.Path(value).expanduser().absolute()
+    if path.is_symlink(): raise ValueError('--install-dir must not be a symlink.')
+    path=path.resolve()
+    if path == pathlib.Path(path.anchor) or path == pathlib.Path.home().resolve():
+        raise ValueError('Choose a dedicated VANI directory, not the filesystem root or your home directory itself.')
+    if path.exists() and not path.is_dir(): raise ValueError('--install-dir must name a directory.')
+    STATE=path;APP=STATE/'app';CONFIG=STATE/'config/vani.env';PREFIX=STATE/'runtime/deps'
 
 
 def env_data(path):
@@ -151,6 +166,7 @@ def report(args):
                 with urllib.request.urlopen(host,timeout=8) as r: ready=r.status<400
             except Exception: ready=False
             add('network '+host,ready,'host','Allow outbound HTTPS or configure the user proxy/CA bundle.')
+    for check in checks: check['fix']=check['fix'].replace('~/vani',str(STATE)).replace('home filesystem','installation filesystem')
     missing=[c for c in checks if not c['ready']]
     return {'schemaVersion':2,'profile':args.profile,'root':str(STATE),'supported':supported,'checks':checks,'missing':missing,'blockers':[c for c in missing if c['kind']=='host'],'ready':not missing,'models':installed,'hardwareAcceptance':'not certified by static checks'}
 
@@ -158,7 +174,7 @@ def report(args):
 def plan(args):
     steps=['Report every missing dependency and host blocker before making changes', 'Install checksum-verified private archive bootstrap, standalone Conda and Node', 'Resolve PostgreSQL 18, pgvector, Poppler and archive tools into ~/vani/runtime/deps', 'Copy application to ~/vani/app; keep private settings in ~/vani/config/vani.env', 'Initialize SCRAM-authenticated PostgreSQL on 127.0.0.1:55432 with data in ~/vani/postgres', 'Back up the managed database; install npm packages, build and migrate', 'Start user-owned processes using ~/vani/bin/vani; logs in ~/vani/logs']
     if args.profile!='app': steps += ['Install private Ollama; pull models into ~/vani/models unless --skip-models']
-    return steps
+    return [step.replace('~/vani',str(STATE)) for step in steps]
 
 
 def print_report(result, as_json=False):
@@ -224,7 +240,7 @@ def install_environment():
 
 def snapshot():
     if ROOT.resolve()==APP.resolve(): return
-    if APP.exists() and not (APP/'.vani-owned').exists(): raise RuntimeError('Refusing to overwrite an unmanaged ~/vani/app.')
+    if APP.exists() and not (APP/'.vani-owned').exists(): raise RuntimeError('Refusing to overwrite an unmanaged '+str(APP)+'.')
     staging=STATE/'app-staging'
     if staging.exists(): shutil.rmtree(staging)
     staging.mkdir()
@@ -255,7 +271,7 @@ def pg_options(): return "-h 127.0.0.1 -p 55432 -k ''"
 
 def database(settings, migrate):
     cluster=STATE/'postgres';env=postgres_env(settings)
-    if cluster.exists() and not (cluster/'.vani-owned').exists(): raise RuntimeError('Refusing to use an unmanaged ~/vani/postgres cluster.')
+    if cluster.exists() and not (cluster/'.vani-owned').exists(): raise RuntimeError('Refusing to use an unmanaged '+str(STATE/'postgres')+' cluster.')
     fresh=not (cluster/'PG_VERSION').exists()
     if not fresh and (cluster/'PG_VERSION').read_text().strip()!='18': raise RuntimeError('Existing cluster requires an explicit PostgreSQL major-version migration.')
     if fresh:
@@ -294,7 +310,7 @@ def install(args):
     if not initial['supported']: return 3
     if initial['blockers']: return 2
     if os.geteuid()==0: raise RuntimeError('Run as your normal user. Root installations are not supported.')
-    if not args.yes and input('Install the listed items into ~/vani? [y/N] ').lower()!='y': return 2
+    if not args.yes and input('Install the listed items into '+str(STATE)+'? [y/N] ').lower()!='y': return 2
     os.umask(0o077)
     STATE.mkdir(parents=True,exist_ok=True);STATE.chmod(0o700)
     # Reject managed directory symlinks instead of writing outside the requested root.
@@ -333,19 +349,21 @@ def install(args):
         final=report(args);private_write(STATE/'health.json',json.dumps(final,indent=2))
         private_write(STATE/'installed-versions.json',json.dumps({'manifest':MANIFEST,'models':final['models']},indent=2))
         print_report(final,args.json)
-        print('VANI: http://127.0.0.1:3000 · Control: ~/vani/bin/vani start|stop|status · Logs: ~/vani/logs')
+        print('VANI: http://127.0.0.1:3000 · Control: '+str(STATE/'bin/vani')+' start|stop|status · Logs: '+str(STATE/'logs'))
         return 0 if final['ready'] else 2
 
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__);m=p.add_mutually_exclusive_group()
     for name in ('check','dry-run','install'): m.add_argument('--'+name,action='store_true')
+    p.add_argument('--install-dir',metavar='PATH',help='Install/check a dedicated writable directory (default: ~/vani; installed helpers use their own location).')
     p.add_argument('--profile',choices=['app','local-5090','local-small'],default='local-5090')
     for name in ('check-network','resume','json','yes','skip-models'): p.add_argument('--'+name,action='store_true')
     args=p.parse_args(argv)
     if not any((args.check,args.dry_run,args.install)): p.print_help();return 0
     if (args.resume or args.skip_models or args.yes) and not args.install: p.error('Installation modifiers require --install')
     try:
+        if args.install_dir is not None: select_install_dir(args.install_dir)
         if args.install: return install(args)
         result=report(args)
         if args.dry_run: result['plan']=plan(args)

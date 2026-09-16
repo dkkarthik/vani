@@ -19,7 +19,7 @@ def running_pid():
 
 def main(argv=None):
     argv=argv if argv is not None else sys.argv[1:]
-    if argv not in (['start'],['stop'],['status']): print('Usage: ~/vani/bin/vani start|stop|status');return 2
+    if argv not in (['start'],['stop'],['status']): print(f'Usage: {STATE}/bin/vani start|stop|status');return 2
     action=argv[0];pid=running_pid()
     if action=='status':
         ready=pid and (STATE/'run.ready').exists()
@@ -30,7 +30,7 @@ def main(argv=None):
         for _ in range(300):
             if running_pid()!=pid: print('VANI stopped.');return 0
             time.sleep(.5)
-        raise RuntimeError('Shutdown timed out; inspect ~/vani/logs before restarting.')
+        raise RuntimeError(f'Shutdown timed out; inspect {STATE}/logs before restarting.')
     if pid:
         print('VANI is already running or starting.');return 0 if (STATE/'run.ready').exists() else 2
     # Readiness file from a crashed process cannot certify a new process.
@@ -40,11 +40,11 @@ def main(argv=None):
     with (STATE/'logs/supervisor.log').open('ab') as log:
         child=subprocess.Popen([sys.executable,str(APP/'scripts/setup/launch.py')],cwd=APP,env=runtime_env(),stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     for _ in range(360):
-        if child.poll() is not None: raise RuntimeError('Startup failed; inspect ~/vani/logs/supervisor.log and service logs.')
+        if child.poll() is not None: raise RuntimeError(f'Startup failed; inspect {STATE}/logs/supervisor.log and service logs.')
         if (STATE/'run.ready').exists() and (STATE/'run.ready').read_text()==str(child.pid): print('VANI running: http://127.0.0.1:3000');return 0
         time.sleep(.5)
     child.terminate()
-    raise RuntimeError('Startup timed out; requested shutdown. Inspect ~/vani/logs.')
+    raise RuntimeError(f'Startup timed out; requested shutdown. Inspect {STATE}/logs.')
 
 if __name__=='__main__':
     try: sys.exit(main())

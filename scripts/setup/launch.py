@@ -18,12 +18,12 @@ def main():
         children.append(child);return child
     def wait_until(check, seconds=60):
         for _ in range(seconds*2):
-            if stopping or any(p.poll() is not None for p in children): raise RuntimeError('A VANI process exited during startup; inspect ~/vani/logs.')
+            if stopping or any(p.poll() is not None for p in children): raise RuntimeError(f'A VANI process exited during startup; inspect {STATE}/logs.')
             try:
                 if check(): return
             except Exception: pass
             time.sleep(.5)
-        raise RuntimeError('Service readiness timeout; inspect ~/vani/logs.')
+        raise RuntimeError(f'Service readiness timeout; inspect {STATE}/logs.')
     with (STATE/'run.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         profile=(STATE/'profile').read_text().strip()

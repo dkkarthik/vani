@@ -21,3 +21,19 @@ Use an unprivileged foreground supervisor and a detached start/stop/status comma
 ## Verification
 
 Test complete preflight reporting and no-mutation modes, bootstrap/checksum handling, no privileged commands, paths with spaces, source snapshots, legacy-data guards, secret permissions, configuration-as-data, managed database authentication/backups, supervisor lifecycle and partial-failure behavior. Run relevant application checks. Report Ubuntu/GPU tests separately from local fixture verification.
+
+## Optional installation directory — 2026-09-16
+
+`--install-dir PATH` selects a dedicated writable directory for check, dry-run,
+install and resume. Default remains `~/vani`. Expand `~`, accept relative paths
+relative to the invocation directory, and normalize to an absolute path. Reject
+empty/control-character paths, files, symlink roots, `/` and the home directory
+itself. No privileges are requested to make an unwritable destination writable.
+All managed paths, disk-space checks, reports and configuration follow this root.
+
+Installed helpers infer the root from the owned `app` snapshot, so the generated
+`bin/vani` command and direct foreground launcher work without an environment
+variable or repeating the option. Source-checkout upgrades must repeat the option.
+Choosing a new directory creates a separate installation; it does not migrate an
+existing library. Fixed service ports still mean only one installation runs at a
+time. Relocating an existing runtime by moving its directory is not supported.
