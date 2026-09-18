@@ -18,6 +18,7 @@ it("saves edited queries from the adjacent control and confirms success", async 
   const profile = {
     question: "Robot navigation",
     objective: "closest",
+    budgets: { d0: 20000, d1: 2000, d2: 200, d3: 50 },
     mode: "review",
     anchors: [],
     publicQueries: [],
@@ -49,6 +50,12 @@ it("saves edited queries from the adjacent control and confirms success", async 
   fireEvent.change(queries, {
     target: { value: "terrain navigation\nrisk aware locomotion" },
   });
+  fireEvent.change(screen.getByLabelText("Targeted comparisons (D2)"), {
+    target: { value: "500" },
+  });
+  fireEvent.change(screen.getByLabelText("Deep readings (D3)"), {
+    target: { value: "100" },
+  });
   const adjacentSave = queries
     .closest("label")!
     .nextElementSibling!.querySelector("button")!;
@@ -61,6 +68,7 @@ it("saves edited queries from the adjacent control and confirms success", async 
         version: 3,
         profile: {
           ...profile,
+          budgets: { ...profile.budgets, d2: 500, d3: 100 },
           publicQueries: ["terrain navigation", "risk aware locomotion"],
         },
       }),

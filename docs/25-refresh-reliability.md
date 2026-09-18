@@ -97,3 +97,18 @@ verified on that desktop.
 - Chrome rendered the live lab without page errors. Full semantic quality and
   5090 hardware acceptance are separate from these software checks; user relevance
   labels remain pending, and no policy was trained on invented reviewer labels.
+
+## Expanded local reading budgets
+
+Defaults are now 200 targeted comparisons (D2) and 50 deep readings (D3) per
+refresh. In **Edit focus and anchors**, adjust **Reading ceilings per refresh**
+and click **Save focus changes**. Supported maxima are 1,000 D2 and 250 D3;
+discovery and screening ceilings remain 20,000 and 2,000. These are upper bounds:
+relevance and evidence still determine advancement. Longer runs may span days;
+daily discovery coalesces with an active run rather than spawning competing runs.
+
+Migration 015 upgrades individual budgets still set to the old 40/10 defaults;
+custom smaller budgets remain unchanged. It preserves historical assessments and
+feedback, supersedes affected active runs, and marks candidates for reassessment.
+After upgrading, click Deep refresh to begin under the new budgets, or wait for
+the next enabled daily refresh. Original run snapshots remain unchanged.

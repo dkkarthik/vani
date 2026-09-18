@@ -76,6 +76,10 @@ export function CorePanel({ id }: { id: string }) {
         Focus version {d.focus.version} · {d.focus.profile.mode} mode · Local
         inference
       </p>
+      <p>
+        Reading ceilings per refresh: {d.focus.profile.budgets.d2} targeted
+        comparisons · {d.focus.profile.budgets.d3} deep readings.
+      </p>
       <button
         className="button secondary"
         onClick={() => {
@@ -188,6 +192,45 @@ export function CorePanel({ id }: { id: string }) {
             {saveButton}
             {action.error && <ErrorNotice error={action.error} />}
           </div>
+          <fieldset>
+            <legend>Reading ceilings per refresh</legend>
+            <p>
+              Larger budgets take longer. Papers still need sufficient relevance
+              and evidence to advance.
+            </p>
+            <label>
+              Targeted comparisons (D2)
+              <input
+                type="number"
+                min={1}
+                max={1000}
+                step={1}
+                value={draft.budgets.d2}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    budgets: { ...draft.budgets, d2: Number(e.target.value) },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Deep readings (D3)
+              <input
+                type="number"
+                min={1}
+                max={250}
+                step={1}
+                value={draft.budgets.d3}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    budgets: { ...draft.budgets, d3: Number(e.target.value) },
+                  })
+                }
+              />
+            </label>
+          </fieldset>
           <label>
             Contribution facets (one per line)
             <textarea

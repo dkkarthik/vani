@@ -95,8 +95,9 @@ export function DeepRefresh({ id }: { id: string }) {
       )}
       <small>
         Default ceilings: 20,000 discovery records, 2,000 screened candidates,
-        40 targeted comparisons and 10 deep readings. Admission follows your
-        collection review policy. Coverage is not exhaustive.
+        200 targeted comparisons and 50 deep readings. Adjust these in Edit
+        focus and anchors. Admission follows your collection review policy.
+        Coverage is not exhaustive.
       </small>
     </section>
   );

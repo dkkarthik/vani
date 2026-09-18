@@ -44,10 +44,10 @@ export const Focus = z.object({
     .object({
       d0: z.number().int().min(1).max(20000).default(20000),
       d1: z.number().int().min(1).max(2000).default(2000),
-      d2: z.number().int().min(1).max(40).default(40),
-      d3: z.number().int().min(1).max(10).default(10),
+      d2: z.number().int().min(1).max(1000).default(200),
+      d3: z.number().int().min(1).max(250).default(50),
     })
-    .default({ d0: 20000, d1: 2000, d2: 40, d3: 10 }),
+    .default({ d0: 20000, d1: 2000, d2: 200, d3: 50 }),
   audits: z
     .object({
       enabled: z.boolean().default(true),

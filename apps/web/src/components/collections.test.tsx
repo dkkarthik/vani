@@ -24,7 +24,11 @@ vi.mock("../api", () => ({
       ? {
           focus: {
             version: 1,
-            profile: { question: "Research focus fixture", mode: "review" },
+            profile: {
+              question: "Research focus fixture",
+              mode: "review",
+              budgets: { d0: 20000, d1: 2000, d2: 200, d3: 50 },
+            },
           },
           runs: [],
           candidates: [],

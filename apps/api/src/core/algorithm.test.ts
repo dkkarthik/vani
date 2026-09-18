@@ -179,3 +179,25 @@ it("treats blog citations as primary-paper leads and ignores script markup", () 
   );
   expect(leads.dois).toEqual(["10.1234/good", "10.48550/arXiv.2401.12345"]);
 });
+it("allows broader local reading while bounding per-run budgets", () => {
+  expect(Focus.parse({ question: "Robot navigation" }).budgets).toEqual({
+    d0: 20000,
+    d1: 2000,
+    d2: 200,
+    d3: 50,
+  });
+  expect(
+    Focus.parse({
+      question: "Robot navigation",
+      budgets: { d2: 1000, d3: 250 },
+    }).budgets.d2,
+  ).toBe(1000);
+  expect(
+    Focus.safeParse({ question: "Robot navigation", budgets: { d2: 1001 } })
+      .success,
+  ).toBe(false);
+  expect(
+    Focus.safeParse({ question: "Robot navigation", budgets: { d3: 251 } })
+      .success,
+  ).toBe(false);
+});
