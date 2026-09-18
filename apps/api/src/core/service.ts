@@ -122,7 +122,9 @@ export async function enqueueCore(id: string) {
     const profile = Focus.parse(focus.profile);
     if (!profile.publicQueries.length && !profile.anchors.length)
       throw Object.assign(
-        Error("Add public queries or explicit anchors before discovery."),
+        Error(
+          "No discovery inputs are configured. Open Research focus and related work → Edit focus and anchors, add Public search queries, save, then retry Deep refresh.",
+        ),
         { statusCode: 409 },
       );
     const policy = (
@@ -148,7 +150,7 @@ export async function enqueueCore(id: string) {
     if (!tasks.length)
       throw Object.assign(
         Error(
-          "No public discovery inputs are available. Uploaded/private seeds stay local; add public search phrases in the collection focus before refreshing.",
+          "No public discovery inputs are available. Uploaded/private seeds stay local. Open Research focus and related work → Edit focus and anchors, add Public search queries (one per line), save, then retry Deep refresh.",
         ),
         { statusCode: 409 },
       );

@@ -29,8 +29,19 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
+    const message = [body?.error?.message, body?.message, body?.error].find(
+      (value) =>
+        typeof value === "string" &&
+        value.trim() &&
+        !["conflict", "request failed"].includes(value.trim().toLowerCase()),
+    );
+    const refreshConflict =
+      response.status === 409 && /\/(?:deep-refresh|core\/refresh)$/.test(path);
     throw new ApiError(
-      body?.error?.message ?? response.statusText,
+      message ??
+        (refreshConflict
+          ? "Refresh could not start. In Research focus and related work, open Edit focus and anchors and check Public search queries. If queries are already saved, inspect logs/api.log for the specific conflict."
+          : response.statusText || `Request failed (HTTP ${response.status}).`),
       response.status,
     );
   }
