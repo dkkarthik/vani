@@ -377,3 +377,53 @@ it.skipIf(!enabled)(
     ).toEqual(ids);
   },
 );
+
+it.skipIf(!enabled)(
+  "extracts seed metadata before ranking and repairs older uploads without replacing corrections",
+  async () => {
+    const pdf = await readFile(
+      new URL("../research/fixtures/two-column.pdf", import.meta.url),
+    );
+    const col = await repo.createCollection({
+      name: "PDF preparation " + uuid(),
+    });
+    const result = await addIngestedPaper(col.id, {
+      bytes: pdf,
+      filename: "opaque-upload.pdf",
+      seed: true,
+    });
+    expect(result.work.title).toBe(
+      "Terrain Response for Reliable Robot Control",
+    );
+    expect(result.work.abstract).toContain("combines robot sensing");
+    expect(result.work.abstract).not.toContain("RIGHT COLUMN");
+    const { prepareLocalPaper } = await import("./enrichment.js");
+    const old = await repo.createWork({
+      title: "old file",
+      abstract: "",
+      accessClass: "user_uploaded",
+    });
+    await (
+      await import("./enrichment.js")
+    ).storePdf(old.id, pdf, "old_file.pdf");
+    await pool.query(
+      "UPDATE document_index SET extractor_version=1 WHERE object_hash IN (SELECT object_hash FROM attachment WHERE work_id=$1)",
+      [old.id],
+    );
+    await prepareLocalPaper(old.id);
+    expect((await repo.getWork(old.id))?.title).toBe(
+      "Terrain Response for Reliable Robot Control",
+    );
+    expect((await repo.getWork(old.id))?.abstract).toContain("safer planning");
+    const { MetadataRepository } = await import("../metadata.js");
+    const metadata = new MetadataRepository(repo),
+      m = await metadata.get(old.id);
+    await metadata.edit(old.id, m.revision, {
+      title: "My reviewed title",
+      abstract: "My reviewed abstract",
+    });
+    await prepareLocalPaper(old.id);
+    expect((await repo.getWork(old.id))?.title).toBe("My reviewed title");
+    expect((await repo.getWork(old.id))?.abstract).toBe("My reviewed abstract");
+  },
+);

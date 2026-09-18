@@ -313,6 +313,24 @@ export function CorePanel({ id }: { id: string }) {
                 c.assessment.reason ??
                 "Awaiting source-grounded assessment."}
             </p>
+            {c.features.exclusion && (
+              <p>
+                Excluded: {c.features.exclusion.reason.replaceAll("_", " ")}
+              </p>
+            )}
+            {c.features.selectionReason && (
+              <p>
+                Selected for: {c.features.selectionReason.replaceAll("_", " ")}
+              </p>
+            )}
+            {c.last_error && (
+              <p role="status">
+                Reading attempt {c.attempts}/3 failed: {c.last_error}
+                {c.state === "pending"
+                  ? ` · Retry after ${new Date(c.next_attempt_at).toLocaleString()}`
+                  : " · Request reading to retry."}
+              </p>
+            )}
             {c.assessment.comparison && (
               <p>
                 Experimental compatibility: {c.assessment.comparison.status}
@@ -330,7 +348,11 @@ export function CorePanel({ id }: { id: string }) {
             </button>{" "}
             <button
               className="button secondary"
-              disabled={action.isPending || c.state === "accepted"}
+              disabled={
+                action.isPending ||
+                c.state === "accepted" ||
+                c.state === "excluded"
+              }
               onClick={() =>
                 action.mutate({ path: `/core/candidates/${c.id}/accept` })
               }
@@ -345,6 +367,7 @@ export function CorePanel({ id }: { id: string }) {
                   body: { depth: "D3" },
                 })
               }
+              disabled={action.isPending || c.state === "excluded"}
             >
               Request deep reading
             </button>{" "}

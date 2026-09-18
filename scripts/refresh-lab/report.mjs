@@ -62,6 +62,13 @@ export function makeReport(data) {
       seedMatches: candidates.filter((c) => c.seedMatch).length,
       newCandidateRecords: candidates.filter((c) => !c.knownMember).length,
       accepted: candidates.filter((c) => c.accepted).length,
+      excluded: candidates.filter((c) => c.state === "excluded").length,
+      failed: candidates.filter((c) => c.state === "failed").length,
+      assessed: candidates.filter(
+        (c) =>
+          Object.keys(c.assessment ?? {}).length > 0 &&
+          !["D0", "D1a"].includes(c.stage),
+      ).length,
       judged: candidates.filter((c) => c.feedback?.label).length,
       stageCounts: candidates.reduce(
         (a, c) => ({
@@ -128,6 +135,8 @@ export function markdownReport(r) {
       `Existing collection paper: ${c.seedMatch ? "seed match" : c.knownMember ? "member match" : "not matched"}`,
       `Retrieved via: ${line(c.retrievalReason)}`,
       `Assessment: ${JSON.stringify(c.assessment)}`,
+      `Exclusion: ${JSON.stringify(c.features?.exclusion ?? null)}`,
+      `Last reading error: ${line(c.last_error)}`,
       `Human feedback: ${JSON.stringify(c.feedback)}`,
       "",
     ]),

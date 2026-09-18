@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { extractPdfMetadata } from "./pdf-metadata.js";
+import { MetadataRepository, recordAssertion } from "../metadata.js";
 import { v7 as uuid } from "uuid";
 import { z } from "zod";
 import { pool, transaction } from "../db.js";
@@ -101,7 +104,7 @@ export async function contributionSummary(work: any) {
       evidence: [],
     };
   const coverage = sources.some((s) => s.page)
-    ? "local PDF excerpts (first 12 pages)"
+    ? "local PDF excerpts (first 4 pages)"
     : "abstract only";
   try {
     const result = await synthesize(
@@ -185,7 +188,59 @@ export async function pdfCandidates(work: any) {
     ),
   ].slice(0, 5);
 }
+export async function prepareLocalPaper(workId: string) {
+  const file = (
+    await pool.query(
+      `SELECT a.id,a.filename,o.storage_path,d.extractor_version FROM attachment a JOIN object_store o ON o.hash_sha256=a.object_hash LEFT JOIN document_index d ON d.object_hash=a.object_hash WHERE canonical_work(a.work_id)=$1 ORDER BY a.created_at DESC LIMIT 1`,
+      [workId],
+    )
+  ).rows[0];
+  if (!file) return;
+  if (file.extractor_version !== 2) await indexDocument(file.id);
+  const repo = new MetadataRepository(new Repository());
+  const m = await repo.get(workId);
+  const fallback = file.filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
+  const fields: Array<"title" | "abstract"> = [];
+  if (!m.fields.abstract && !m.locks.includes("abstract"))
+    fields.push("abstract");
+  const explicitTitle = (
+    await pool.query(
+      "SELECT 1 FROM source_record WHERE work_id=$1 AND connector='collection-ingestion' AND payload->>'explicitTitle' IS NOT NULL LIMIT 1",
+      [workId],
+    )
+  ).rowCount;
+  if (
+    m.fields.title === fallback &&
+    !explicitTitle &&
+    !m.locks.includes("title")
+  )
+    fields.push("title");
+  if (!fields.length) return;
+  const extracted = await extractPdfMetadata(await readFile(file.storage_path));
+  const usable = fields.filter((f) => extracted[f]);
+  if (!usable.length) return;
+  const assertion = await transaction((db) =>
+    recordAssertion(db, workId, {
+      source: "local-pdf",
+      externalId: file.id,
+      sourceUrl: "",
+      authoritative: false,
+      metadata: { title: extracted.title, abstract: extracted.abstract },
+      raw: extracted.extraction,
+    }),
+  );
+  await repo.reconcile(
+    workId,
+    m.revision,
+    assertion.id,
+    usable,
+    false,
+    false,
+    "Automatically recovered missing PDF metadata locally; existing corrections preserved.",
+  );
+}
 export async function enrichPaper(workId: string) {
+  await prepareLocalPaper(workId);
   const work = await new Repository().getWork(workId);
   if (!work) return;
   let local = (

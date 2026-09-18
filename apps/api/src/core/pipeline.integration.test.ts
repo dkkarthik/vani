@@ -258,3 +258,208 @@ it.skipIf(!enabled)(
   },
   20000,
 );
+
+it.skipIf(!enabled)(
+  "screens peers before deep reading and isolates bounded failures across restarts",
+  async () => {
+    await pool.query(
+      "UPDATE core_run SET status='superseded' WHERE status IN ('queued','running','paused','awaiting_evidence')",
+    );
+    const collection = await repo.createCollection({
+      name: "Recovery " + uuid(),
+    });
+    const run = await enqueueCore(collection.id);
+    const make = async (title: string) =>
+      stageCandidate(
+        run,
+        {
+          title,
+          abstract: "We learn safe robot control from terrain observations.",
+          connector: "fixture",
+          externalId: uuid(),
+          sourcePayload: {},
+        },
+        { channel: "fixture" },
+      );
+    const bad = await make("Failure prone robot learning"),
+      good = await make("Successful robot learning"),
+      deep = await make("Deep robot comparison");
+    const work = await repo.createWork({ title: deep.paper.title });
+    await storePdf(
+      work.id,
+      await readFile(
+        new URL("../research/fixtures/reading.pdf", import.meta.url),
+      ),
+      "candidate.pdf",
+    );
+    await pool.query(
+      "UPDATE core_candidate SET stage='D1a',features=jsonb_build_object('score',CASE WHEN id=$2 THEN 2 ELSE 1 END) WHERE run_id=$1",
+      [run.id, bad.id],
+    );
+    await pool.query(
+      "UPDATE core_candidate SET stage='D2',work_id=$2,features=jsonb_build_object('score',999) WHERE id=$1",
+      [deep.id, work.id],
+    );
+    await pool.query("UPDATE core_run SET phase='screening' WHERE id=$1", [
+      run.id,
+    ]);
+    resetModelIdentity();
+    const order: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, init) => {
+        if (String(url).endsWith("/api/tags"))
+          return Response.json({
+            models: [{ name: config.ollamaModel, digest: "reader" }],
+          });
+        const body = JSON.parse(String(init?.body)),
+          packet = JSON.parse(body.messages[1].content);
+        const key = packet.paper?.workId ?? "deep";
+        order.push(key);
+        if (key !== good.id)
+          throw new DOMException("Local inference timed out", "TimeoutError");
+        return Response.json({
+          message: {
+            content: JSON.stringify({
+              contribution: "A grounded control method",
+              likelyRelated: false,
+              reason: "Different problem",
+              quote: packet.paper.text,
+              uncertainties: [],
+            }),
+          },
+        });
+      }),
+    );
+    await runCoreWorker();
+    let failed = (
+      await pool.query("SELECT * FROM core_candidate WHERE id=$1", [bad.id])
+    ).rows[0];
+    expect(failed.attempts).toBe(1);
+    expect(failed.state).toBe("pending");
+    expect(failed.last_error).toContain("timed out");
+    expect(new Date(failed.next_attempt_at).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
+    await enqueueCore(collection.id); // Daily/manual resume must not clear candidate backoff.
+    expect(
+      (
+        await pool.query("SELECT attempts FROM core_candidate WHERE id=$1", [
+          bad.id,
+        ])
+      ).rows[0].attempts,
+    ).toBe(1);
+    await runCoreWorker();
+    await runCoreWorker();
+    expect(order.slice(0, 3)).toEqual([bad.id, good.id, "deep"]);
+    expect(
+      (await pool.query("SELECT status FROM core_run WHERE id=$1", [run.id]))
+        .rows[0].status,
+    ).toBe("running");
+    for (let i = 0; i < 5; i++) {
+      await pool.query(
+        "UPDATE core_candidate SET next_attempt_at=now() WHERE run_id=$1",
+        [run.id],
+      );
+      await runCoreWorker();
+    }
+    failed = (
+      await pool.query("SELECT * FROM core_candidate WHERE id=$1", [bad.id])
+    ).rows[0];
+    expect(failed.state).toBe("failed");
+    expect(failed.attempts).toBe(3);
+    expect(failed.features.readingErrors).toHaveLength(3);
+    expect(
+      (await pool.query("SELECT status FROM core_run WHERE id=$1", [run.id]))
+        .rows[0].status,
+    ).toBe("completed_with_errors");
+    const next = await enqueueCore(collection.id);
+    expect(next.id).not.toBe(run.id);
+    expect(
+      (
+        await pool.query(
+          "SELECT attempts,state FROM core_candidate WHERE id=$1",
+          [bad.id],
+        )
+      ).rows[0],
+    ).toMatchObject({ attempts: 0, state: "pending" });
+    await pool.query("UPDATE core_run SET status='superseded' WHERE id=$1", [
+      next.id,
+    ]);
+  },
+  20000,
+);
+
+it.skipIf(!enabled)(
+  "expands citations from a discovered public seed match without sending uploaded text online",
+  async () => {
+    await pool.query(
+      "UPDATE core_run SET status='superseded' WHERE status IN ('queued','running','paused','awaiting_evidence')",
+    );
+    const col = await repo.createCollection({ name: "Public match " + uuid() });
+    const anchor = await repo.createWork({
+      title: "A private terrain controller manuscript " + uuid(),
+      abstract: "Private research text",
+      accessClass: "user_uploaded",
+    });
+    await repo.addToCollection(col.id, [anchor.id]);
+    const f = await getFocus(col.id);
+    await saveFocus(
+      col.id,
+      f.version,
+      Focus.parse({
+        ...f.profile,
+        anchors: [{ workId: anchor.id }],
+        publicQueries: ["legged terrain control"],
+      }),
+    );
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) => {
+        calls.push(String(url));
+        return Response.json({
+          results: [
+            {
+              id: "https://openalex.org/W90009999",
+              title: anchor.title,
+              authorships: [],
+              referenced_works: ["https://openalex.org/W90008888"],
+            },
+          ],
+          meta: {},
+        });
+      }),
+    );
+    const run = await enqueueCore(col.id);
+    await runCoreWorker();
+    const saved = (
+      await pool.query("SELECT * FROM core_run WHERE id=$1", [run.id])
+    ).rows[0];
+    expect(saved.frontier).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "references",
+          filter: "openalex:W90008888",
+        }),
+        expect.objectContaining({
+          source: "citing",
+          filter: "cites:W90009999",
+        }),
+      ]),
+    );
+    expect(calls).toHaveLength(1);
+    expect(decodeURIComponent(calls[0]!)).not.toContain(anchor.title);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM source_record WHERE work_id=$1 AND connector='openalex'",
+          [anchor.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    await pool.query("UPDATE core_run SET status='superseded' WHERE id=$1", [
+      run.id,
+    ]);
+  },
+);

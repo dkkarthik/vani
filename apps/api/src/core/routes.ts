@@ -224,7 +224,7 @@ export async function registerCore(app: FastifyInstance) {
     ).rows;
     const candidates = (
       await pool.query(
-        "SELECT id,identity,work_id,paper->>'title' title,stage,state,proximity,role,features-'embedding' features,assessment,feedback,paths,focus_version,created_at FROM core_candidate WHERE collection_id=$1 ORDER BY (features->>'score')::float DESC NULLS LAST,id LIMIT 50 OFFSET $2",
+        "SELECT id,identity,work_id,paper->>'title' title,stage,state,proximity,role,features-'embedding' features,assessment,feedback,paths,last_error,attempts,next_attempt_at,focus_version,created_at FROM core_candidate WHERE collection_id=$1 ORDER BY (state='excluded'),(features->>'score')::float DESC NULLS LAST,id LIMIT 50 OFFSET $2",
         [id, offset],
       )
     ).rows;
@@ -321,9 +321,17 @@ export async function registerCore(app: FastifyInstance) {
     ).rows[0];
     if (!c)
       throw Object.assign(Error("Candidate not found."), { statusCode: 404 });
+    if (c.state === "excluded")
+      throw Object.assign(
+        Error(
+          "This record is excluded from new-paper reading: " +
+            c.features.exclusion?.reason,
+        ),
+        { statusCode: 409 },
+      );
     const run = await enqueueCore(c.collection_id);
     await pool.query(
-      "UPDATE core_candidate SET stage=$2,state='pending',run_id=$3,focus_version=$4,assessment=assessment||'{\"explicitReadingOverride\":true}'::jsonb WHERE id=$1",
+      "UPDATE core_candidate SET stage=$2,state='pending',run_id=$3,focus_version=$4,attempts=0,last_error=NULL,next_attempt_at=now(),assessment=assessment||'{\"explicitReadingOverride\":true}'::jsonb WHERE id=$1",
       [id, depth, run.id, run.focus_version],
     );
     return { status: "queued" };

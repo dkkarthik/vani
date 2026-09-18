@@ -1,3 +1,4 @@
+import { extractPdfMetadata } from "./pdf-metadata.js";
 import { v7 as uuid } from "uuid";
 import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -71,6 +72,15 @@ export async function addIngestedPaper(
     throw Object.assign(Error("Supply a PDF or a paper link."), {
       statusCode: 400,
     });
+  if (bytes) {
+    const extracted = await extractPdfMetadata(bytes);
+    metadata = {
+      ...extracted,
+      ...metadata,
+      title: metadata.title || extracted.title,
+      abstract: metadata.abstract || extracted.abstract,
+    };
+  }
   const hash = bytes
     ? createHash("sha256").update(bytes).digest("hex")
     : undefined;
@@ -96,11 +106,22 @@ export async function addIngestedPaper(
         accessClass: input.bytes ? "user_uploaded" : "metadata_only",
         connector: "collection-ingestion",
         externalId: source || "sha256:" + hash,
-        sourcePayload: { sourceUrl: source, pdfUrls, uploadHash: hash },
+        sourcePayload: {
+          sourceUrl: source,
+          pdfUrls,
+          uploadHash: hash,
+          explicitTitle: input.title?.trim() || null,
+        },
         deduplicateByTitle: false,
       });
   if (!work) throw Error("Paper could not be created.");
-  const provenance = { sourceUrl: source, pdfUrls, uploadHash: hash, metadata };
+  const provenance = {
+    sourceUrl: source,
+    pdfUrls,
+    uploadHash: hash,
+    metadata,
+    explicitTitle: input.title?.trim() || null,
+  };
   await pool.query(
     "INSERT INTO source_record(id,work_id,connector,external_id,payload,payload_hash) VALUES($1,$2,'collection-ingestion',$3,$4,$5) ON CONFLICT DO NOTHING",
     [
@@ -124,7 +145,17 @@ export async function addIngestedPaper(
     if (!row) throw Error("Collection no longer exists.");
     await db.query(
       "INSERT INTO collection_membership(collection_id,work_id,inclusion_reason) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
-      [collectionId, work.id,JSON.stringify({kind:input.bytes?"upload":"link",text:input.bytes?"You uploaded this PDF to the collection.":"You added this paper through a paper link or DOI.",sourceUrl:source||undefined})],
+      [
+        collectionId,
+        work.id,
+        JSON.stringify({
+          kind: input.bytes ? "upload" : "link",
+          text: input.bytes
+            ? "You uploaded this PDF to the collection."
+            : "You added this paper through a paper link or DOI.",
+          sourceUrl: source || undefined,
+        }),
+      ],
     );
     if (input.seed) {
       const current = row.discovery ?? {
@@ -163,6 +194,7 @@ export async function addIngestedPaper(
     queued: true,
     seed: seedApplied,
     seedWarning,
+    metadataWarnings: metadata.extraction?.warnings ?? [],
   };
 }
 export async function registerIngestion(

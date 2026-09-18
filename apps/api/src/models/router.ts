@@ -39,8 +39,8 @@ export const taskLimits: Record<
   synthesis: { output: 2048, thinking: false, priority: 2 },
   collection_conversation: { output: 3072, thinking: false, priority: 0 },
   d1: { output: 768, thinking: false, priority: 3 },
-  d2: { output: 3072, thinking: true, priority: 3 },
-  d3: { output: 6144, thinking: true, priority: 4 },
+  d2: { output: 6144, thinking: true, priority: 3 },
+  d3: { output: 8192, thinking: true, priority: 4 },
   early_audit: { output: 2048, thinking: true, priority: 9 },
   deep_audit: { output: 4096, thinking: true, priority: 9 },
   embedding: { output: 0, thinking: false, priority: 3 },
@@ -248,8 +248,22 @@ export async function generate<T>(
     throw new Error(
       "Cloud escalation is not permitted for this task or evidence.",
     );
+  const configured = Number(
+    process.env[`VANI_${task.toUpperCase()}_TIMEOUT_MS`],
+  );
+  const defaultTimeout =
+    task === "d3" ? 600000 : task === "d2" ? 360000 : 180000;
   const timeout = AbortSignal.timeout(
-    Math.min(options.timeoutMs ?? 180000, 600000),
+    Math.max(
+      1000,
+      Math.min(
+        options.timeoutMs ??
+          (Number.isFinite(configured) && configured > 0
+            ? configured
+            : defaultTimeout),
+        600000,
+      ),
+    ),
   );
   const signal = options.signal
     ? AbortSignal.any([timeout, options.signal])

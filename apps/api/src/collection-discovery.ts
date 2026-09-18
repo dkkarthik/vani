@@ -259,25 +259,38 @@ export function startDiscoveryWorker(
   repository: Repository,
   onError: (error: unknown) => void,
 ) {
-  let running = false;
-  const tick = async () => {
-    if (running) return;
-    running = true;
-    try {
+  // Separate durable queues: a slow paper read must not block daily scheduling,
+  // PDF downloads or unrelated collections. Model inference remains serialized
+  // by the router's shared priority/resource lease.
+  const lane = (work: () => Promise<void>, ms: number) => {
+    let busy = false;
+    const tick = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        await work();
+      } catch (error) {
+        onError(error);
+      } finally {
+        busy = false;
+      }
+    };
+    const timer = setInterval(() => void tick(), ms);
+    timer.unref();
+    void tick();
+    return timer;
+  };
+  const timers = [
+    lane(async () => {
       await runCoreWorker();
       await resumeEvidence();
-      await runEnrichment();
+    }, 2000),
+    lane(runEnrichment, 3000),
+    lane(async () => {
       await runDueCollections(repository);
       await scheduleAudits();
-      await runAuditWorker();
-    } catch (error) {
-      onError(error);
-    } finally {
-      running = false;
-    }
-  };
-  const timer = setInterval(() => void tick(), 2000);
-  timer.unref();
-  void tick();
-  return () => clearInterval(timer);
+    }, 60000),
+    lane(runAuditWorker, 10000),
+  ];
+  return () => timers.forEach(clearInterval);
 }

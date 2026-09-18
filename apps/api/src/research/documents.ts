@@ -1,3 +1,4 @@
+import { logicalPdfPages } from "./pdf-text.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
@@ -54,7 +55,7 @@ export async function indexDocument(id: string) {
       const result = await execute(
         "pdftotext",
         [
-          "-layout",
+          "-bbox-layout",
           "-enc",
           "UTF-8",
           "-f",
@@ -66,12 +67,7 @@ export async function indexDocument(id: string) {
         ],
         { timeout: 60000, maxBuffer: 20 * 1024 * 1024 },
       );
-      const texts = result.stdout.split("\f");
-      if (texts.at(-1)?.trim() === "") texts.pop();
-      const pages = Array.from(
-        { length: Math.min(count, 2000) },
-        (_, index) => ({ page: index + 1, text: texts[index] ?? "" }),
-      );
+      const pages = logicalPdfPages(result.stdout);
       const nonempty = pages.filter((page) => page.text.trim()).length;
       const state = !nonempty
         ? "no_text"
@@ -85,7 +81,7 @@ export async function indexDocument(id: string) {
             ? "Some pages have no extractable text; OCR may be needed."
             : "";
       await pool.query(
-        "INSERT INTO document_index(object_hash,state,pages,page_count,error) VALUES($1,$2,$3,$4,$5) ON CONFLICT(object_hash) DO UPDATE SET state=$2,pages=$3,page_count=$4,error=$5,indexed_at=now()",
+        "INSERT INTO document_index(object_hash,state,pages,page_count,error,extractor_version) VALUES($1,$2,$3,$4,$5,2) ON CONFLICT(object_hash) DO UPDATE SET state=$2,pages=$3,page_count=$4,error=$5,extractor_version=2,indexed_at=now()",
         [file.object_hash, state, JSON.stringify(pages), count, error],
       );
       return { state, pageCount: count, indexedPages: nonempty, error };

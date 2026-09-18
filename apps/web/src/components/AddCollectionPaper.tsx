@@ -113,7 +113,8 @@ export function AddCollectionPaper({
             {add.data.localPdf
               ? "PDF saved locally."
               : "PDF acquisition queued."}{" "}
-            Contribution summary queued. {add.data.seedWarning}
+            Contribution summary queued. {add.data.seedWarning}{" "}
+            {add.data.metadataWarnings?.join(" ")}
           </p>
         )}
         <button

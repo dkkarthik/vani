@@ -164,3 +164,6 @@ Keys are deterministic, collision-safe, user-editable, and frozen after export u
 5. Evaluation hardening, import/export round trips, backup, and release packaging.
 
 The authoritative release gate is [docs/11-acceptance-tests.md](docs/11-acceptance-tests.md).
+
+Seeded refresh recovery, PDF repair, and daily desktop upgrade steps are documented
+in [the refresh reliability guide](docs/25-refresh-reliability.md).
