@@ -23,6 +23,13 @@ No root, sudo or Docker is needed. Missing dependencies are reported first; the 
 
 Open `http://127.0.0.1:3000`. See the [VANI 1.0 installation and operations guide](docs/23-vani-1.0.md) for dependency checks, upgrades, calibration, local conversations and target-hardware acceptance.
 
+### Evaluate collection refresh locally
+
+Run `npm run build` then `npm run lab:start` to open an isolated [refresh lab](http://127.0.0.1:18082/lab).
+Upload seed PDFs, inspect retrieved candidates and pipeline failures, record your
+judgments and missing papers, and save review rounds. See the [lab guide](docs/24-refresh-lab.md)
+for prerequisites, local model configuration and evaluation limits.
+
 ### Local development
 
 Requirements: Node.js 22+, Docker, and Docker Compose.

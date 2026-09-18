@@ -322,7 +322,10 @@ export async function generate<T>(
               : {
                   model,
                   messages,
-                  format: "json",
+                  format: z.toJSONSchema(schema, {
+                    target: "draft-07",
+                    io: "input",
+                  }),
                   think: limits.thinking,
                   stream: false,
                   keep_alive: "5m",

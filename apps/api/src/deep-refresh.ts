@@ -59,7 +59,7 @@ export async function registerDeepRefresh(
       job: row
         ? {
             ...row,
-            scanned: row.counters.d0 ?? 0,
+            scanned: row.counters.discovered ?? 0,
             added,
             warnings: row.coverage
               .filter((c: any) => c.state !== "complete")

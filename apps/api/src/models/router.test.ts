@@ -119,3 +119,26 @@ it("rejects malformed embedding dimensions", async () => {
   );
   await expect(embed(["a", "b"])).rejects.toThrow("shape");
 });
+
+it("sends the task schema to local structured generation and still validates the response", async () => {
+  const schema = z.object({
+    text: z.string(),
+    uncertainties: z.array(z.string()).default([]),
+  });
+  await generate("Return text and uncertainties", { source: "paper" }, schema);
+  const call = vi
+    .mocked(fetch)
+    .mock.calls.find(([url]) => String(url).endsWith("/api/chat"));
+  const body = JSON.parse(String(call?.[1]?.body));
+  expect(body.format.type).toBe("object");
+  expect(body.format.properties.text.type).toBe("string");
+  expect(body.format.required).toContain("text");
+  expect(body.format.properties.uncertainties.type).toBe("array");
+  vi.mocked(fetch).mockResolvedValue(
+    Response.json({
+      done: true,
+      message: { content: JSON.stringify({ text: null }) },
+    }),
+  );
+  await expect(generate("Return text", {}, schema)).rejects.toThrow();
+});

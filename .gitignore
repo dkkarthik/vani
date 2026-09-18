@@ -11,3 +11,5 @@ vani-0.1-build-package.zip
 
 __pycache__/
 *.pyc
+
+.vani-refresh-lab/

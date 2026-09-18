@@ -140,6 +140,13 @@ export async function enqueueCore(id: string) {
       if (w && !["private", "user_uploaded"].includes(w.access_class) && w.doi)
         tasks.push({ source: "anchor", query: w.doi, cursor: "*", pages: 0 });
     }
+    if (!tasks.length)
+      throw Object.assign(
+        Error(
+          "No public discovery inputs are available. Uploaded/private seeds stay local; add public search phrases in the collection focus before refreshing.",
+        ),
+        { statusCode: 409 },
+      );
     await db.query(
       "UPDATE core_run SET status='superseded' WHERE collection_id=$1 AND status='awaiting_evidence'",
       [id],

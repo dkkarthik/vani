@@ -217,3 +217,104 @@ it.skipIf(!enabled)(
     );
   },
 );
+
+it.skipIf(!enabled)(
+  "reports the persisted discovered counter before ranking",
+  async () => {
+    const c = await collection(),
+      job = await enqueueDeepRefresh(c.id);
+    await pool.query(
+      "UPDATE core_run SET counters=jsonb_build_object('discovered',37) WHERE id=$1",
+      [job.id],
+    );
+    const { buildApp } = await import("./app.js");
+    const app = await buildApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/v1/collections/${c.id}/deep-refresh`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().job.scanned).toBe(37);
+      expect(response.json().job.added).toBe(0);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+it.skipIf(!enabled)(
+  "adding an uploaded seed preserves explicitly configured queries with null keywords",
+  async () => {
+    const c = await repo.createCollection({
+      name: "Seed query regression " + uuid(),
+    });
+    const f = await getFocus(c.id);
+    await saveFocus(
+      c.id,
+      f.version,
+      Focus.parse({
+        ...f.profile,
+        publicQueries: ["robot learning from demonstrations"],
+      }),
+    );
+    const w = await repo.createWork({
+      title: "Uploaded seed " + uuid(),
+      accessClass: "user_uploaded",
+    });
+    await pool.query("UPDATE collection SET discovery=$2 WHERE id=$1", [
+      c.id,
+      JSON.stringify({
+        mode: "papers",
+        topic: "",
+        workIds: [w.id],
+        enabled: false,
+      }),
+    ]);
+    const updated = await getFocus(c.id);
+    expect(updated.profile.publicQueries).toEqual([
+      "robot learning from demonstrations",
+    ]);
+    expect(updated.profile.anchors.map((a: any) => a.workId)).toEqual([w.id]);
+    const run = await enqueueDeepRefresh(c.id);
+    expect(
+      run.frontier.some(
+        (t: any) => t.query === "robot learning from demonstrations",
+      ),
+    ).toBe(true);
+  },
+);
+it.skipIf(!enabled)(
+  "rejects private-only seeds with no executable public search instead of creating an empty run",
+  async () => {
+    const c = await repo.createCollection({
+      name: "Private-only seed " + uuid(),
+    });
+    const w = await repo.createWork({
+      title: "Unpublished robot seed " + uuid(),
+      doi: "10.1234/" + uuid(),
+      accessClass: "user_uploaded",
+    });
+    const f = await getFocus(c.id);
+    await saveFocus(
+      c.id,
+      f.version,
+      Focus.parse({
+        ...f.profile,
+        publicQueries: [],
+        anchors: [{ workId: w.id }],
+      }),
+    );
+    await expect(enqueueDeepRefresh(c.id)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining("No public discovery inputs"),
+    });
+    expect(
+      (
+        await pool.query("SELECT id FROM core_run WHERE collection_id=$1", [
+          c.id,
+        ])
+      ).rowCount,
+    ).toBe(0);
+  },
+);

@@ -28,7 +28,12 @@
     "start:local": "python3 scripts/setup/launch.py",
     "setup:check": "bash scripts/setup-ubuntu.sh --check",
     "test:setup": "python3 -m unittest discover -s scripts/setup -p 'test_*.py'",
-    "models:smoke": "node scripts/local-model-smoke.mjs"
+    "models:smoke": "node scripts/local-model-smoke.mjs",
+    "lab:start": "python3 scripts/refresh-lab.py start",
+    "lab:stop": "python3 scripts/refresh-lab.py stop",
+    "lab:status": "python3 scripts/refresh-lab.py status",
+    "test:lab": "node --test scripts/refresh-lab/report.test.mjs",
+    "lab:compare": "node scripts/refresh-lab/compare.mjs"
   },
   "engines": {
     "node": ">=22.22.0"
