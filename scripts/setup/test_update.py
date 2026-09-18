@@ -74,3 +74,23 @@ class UpdateTests(unittest.TestCase):
     self.assertTrue(fetch.call_args.args[0].full_url.endswith('/'+'b'*40))
    self.assertEqual(update.read(self.root/'updates/status.json')['state'],'complete')
   finally:held.close()
+
+ def test_reload_check_bypasses_fresh_cache(self):
+  with patch.object(update.urllib.request,'urlopen') as fetch:
+   fetch.return_value.__enter__.side_effect=lambda:io.BytesIO(json.dumps({'sha':'b'*40}).encode())
+   update.check(self.root); update.check(self.root,force=True)
+   self.assertEqual(fetch.call_count,2)
+ def test_regular_checks_expire_after_two_hours(self):
+  with patch.object(update.time,'time',return_value=20000) as clock,patch.object(update.urllib.request,'urlopen') as fetch:
+   fetch.return_value.__enter__.side_effect=lambda:io.BytesIO(json.dumps({'sha':'b'*40}).encode())
+   update.check(self.root)
+   clock.return_value=27199;update.check(self.root);self.assertEqual(fetch.call_count,1)
+   clock.return_value=27200;update.check(self.root);self.assertEqual(fetch.call_count,2)
+ def test_failed_check_does_not_offer_stale_update(self):
+  with patch.object(update.urllib.request,'urlopen',side_effect=OSError('offline')):
+   self.assertFalse(update.check(self.root,force=True)['available'])
+  with self.assertRaisesRegex(ValueError,'Check for updates again'):update.start(self.root,'b'*40)
+ def test_matching_commit_does_not_offer_update(self):
+  with patch.object(update.urllib.request,'urlopen') as fetch:
+   fetch.return_value.__enter__.return_value=io.BytesIO(json.dumps({'sha':'a'*40}).encode())
+   self.assertFalse(update.check(self.root)['available'])

@@ -22,8 +22,9 @@ than relying on the currently fixed 1.0 package version.
 
 ## What the button does
 
-- Checks GitHub main automatically at most every six hours while the UI is open.
-  A manual check is throttled to 30 seconds. Network failures are shown and retried.
+- Checks GitHub main automatically every two hours while the UI is open, and on every browser page reload.
+  Manual checks also bypass the cached result. Simultaneous checks share a lock;
+  network failures disable installation until a successful check and are retried.
 - Downloads an archive pinned to the commit shown in the UI. If main changes after
   the check, a later check offers the next commit.
 - Runs the existing rootless installer in a detached process, retaining your

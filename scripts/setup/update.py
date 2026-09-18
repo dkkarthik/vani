@@ -76,7 +76,7 @@ def status(root):
     latest = read(root/'updates/latest.json', {})
     supported = bool(SHA.fullmatch(identity.get('commit') or '') and not identity.get('dirty'))
     return {'supported':supported, 'installed':identity.get('commit'), 'latest':latest.get('commit'),
-            'available':bool(supported and latest.get('commit') and latest['commit']!=identity.get('commit')),
+            'available':bool(supported and not latest.get('error') and latest.get('commit') and latest['commit']!=identity.get('commit')),
             'checkedAt':latest.get('checkedAt'), 'checkError':latest.get('error'), 'job':job,
             'reason':None if supported else 'Run one terminal upgrade from a clean Git checkout to enable UI updates.',
             'installRoot':str(root), 'repository':REPOSITORY}
@@ -86,7 +86,7 @@ def check(root, force=False):
     managed(root)
     cache = read(root/'updates/latest.json', {})
     age = time.time() - cache.get('timestamp', 0)
-    if age < (30 if force else 300 if cache.get('error') else 21600): return status(root)
+    if not force and age < (300 if cache.get('error') else 7200): return status(root)
     handle_path = root/'updates/check.lock'
     handle_path.parent.mkdir(exist_ok=True, mode=0o700)
     with handle_path.open('a') as handle:
@@ -108,7 +108,8 @@ def start(root, commit):
     identity=managed(root)
     if not SHA.fullmatch(commit): raise ValueError('Invalid update commit.')
     if identity.get('dirty') or not SHA.fullmatch(identity.get('commit') or ''): raise ValueError('Updates require a clean, identified installation.')
-    if commit != read(root/'updates/latest.json', {}).get('commit'): raise ValueError('Check for updates again before installing.')
+    latest=read(root/'updates/latest.json', {})
+    if latest.get('error') or commit != latest.get('commit'): raise ValueError('Check for updates again before installing.')
     handle=lock(root)
     if not handle: return status(root)
     try:

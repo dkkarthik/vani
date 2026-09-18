@@ -79,3 +79,46 @@ it("keeps recovery instructions visible when services disconnect", async () => {
   ).toHaveTextContent("/research/vani/logs/update.log");
   client.clear();
 });
+it("checks GitHub on each fresh page load, then uses cached status polling", async () => {
+  vi.mocked(request).mockResolvedValue(available);
+  let client = show();
+  await screen.findByRole("button", { name: "Update VANI" });
+  expect(request).toHaveBeenCalledWith("/system/updates/check", {
+    method: "POST",
+    headers: { "X-VANI-Update": "1" },
+    body: "{}",
+  });
+  await client.invalidateQueries({ queryKey: ["system-updates"] });
+  expect(request).toHaveBeenCalledWith("/system/updates");
+  cleanup();
+  client.clear();
+  vi.mocked(request).mockClear();
+  client = show();
+  await screen.findByRole("button", { name: "Update VANI" });
+  expect(request).toHaveBeenCalledWith(
+    "/system/updates/check",
+    expect.anything(),
+  );
+  client.clear();
+});
+it.each([
+  { ...available, available: false, latest: available.installed },
+  { ...available, checkError: "GitHub unavailable" },
+])("disables installation when up to date or check failed", async (data) => {
+  vi.mocked(request).mockResolvedValue(data);
+  const client = show();
+  expect(
+    await screen.findByRole("button", { name: "Update VANI" }),
+  ).toBeDisabled();
+  client.clear();
+});
+it("disables a previously available update when a subsequent status request fails", async () => {
+  vi.mocked(request).mockResolvedValue(available);
+  const client = show();
+  const button = await screen.findByRole("button", { name: "Update VANI" });
+  await waitFor(() => expect(button).toBeEnabled());
+  vi.mocked(request).mockRejectedValue(new Error("offline"));
+  await client.invalidateQueries({ queryKey: ["system-updates"] });
+  await waitFor(() => expect(button).toBeDisabled());
+  client.clear();
+});

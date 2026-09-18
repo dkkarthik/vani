@@ -2,8 +2,8 @@
 
 ## User flow
 
-A global update notice checks the official GitHub main branch at most every six
-hours. Settings shows installed/latest commit, a manual check, and Update VANI.
+A global update notice checks the official GitHub main branch every two
+hours while the UI is open, plus a fresh check on every browser reload. Settings shows installed/latest commit, a manual check, and Update VANI.
 The button installs the checked commit from dkkarthik/vani; no repository, branch,
 shell command, or filesystem path is accepted from the browser. New commits after
 that check appear on a subsequent check. One initial terminal upgrade is required.
@@ -41,3 +41,13 @@ Test check caching, archive safety, single-worker lock, pinned installer argumen
 source-edit protection and error persistence, API request guards and UI start /
 reconnect/success behavior. Run installer lifecycle tests, workspace checks and
 builds. Actual Ubuntu install/restart acceptance remains a target-host check.
+
+## Check cadence and button state
+
+A fresh browser query cache invokes the guarded check endpoint, bypassing the
+server cache. Settings and the global notice share one query to avoid duplicate
+requests. Lightweight status polling uses a two-hour GitHub cache; failed checks
+retry after five minutes. Page reload and manual checks bypass both intervals.
+Installation stays disabled while checking, after a check/request failure, when
+up to date, and during an update. The server also rejects installs from a failed
+check. An old cached different commit cannot enable the button after a failure.

@@ -17,18 +17,30 @@ type UpdateStatus = {
 const busy = (state?: string) =>
   ["queued", "downloading", "installing"].includes(state ?? "");
 export function useUpdates() {
+  const client = useQueryClient();
   return useQuery({
     queryKey: ["system-updates"],
-    queryFn: () => request<UpdateStatus>("/system/updates"),
+    // A browser reload creates a fresh query cache: explicitly bypass the server
+    // check cache once. Both the notice and Settings share this deduplicated query.
+    queryFn: () =>
+      client.getQueryData(["system-updates"]) === undefined
+        ? request<UpdateStatus>("/system/updates/check", {
+            method: "POST",
+            headers: { "X-VANI-Update": "1" },
+            body: "{}",
+          })
+        : request<UpdateStatus>("/system/updates"),
+    staleTime: 60000,
+    refetchIntervalInBackground: true,
     refetchInterval: (query) =>
       busy(query.state.data?.job.state) ? 3000 : 60000,
     retry: false,
   });
 }
 export function UpdateNotice() {
-  const { data } = useUpdates();
+  const { data, isError } = useUpdates();
   if (
-    !data?.available &&
+    (!data?.available || isError || Boolean(data?.checkError)) &&
     !busy(data?.job.state) &&
     data?.job.state !== "failed"
   )
@@ -65,8 +77,8 @@ export function Updates() {
     <section className="settings-card">
       <h2>VANI updates</h2>
       <p>
-        Checks GitHub main periodically. Updates install only when you click the
-        button.
+        Checks GitHub every two hours while VANI is open and whenever you reload
+        the page. Updates install only when you click the button.
       </p>
       {data && (
         <p>
@@ -102,7 +114,14 @@ export function Updates() {
           </button>{" "}
           <button
             className="button primary"
-            disabled={!data.available || running || action.isPending}
+            disabled={
+              !data.available ||
+              Boolean(data.checkError) ||
+              status.isError ||
+              status.isFetching ||
+              running ||
+              action.isPending
+            }
             onClick={() => {
               setRequested(true);
               action.mutate({ path: "install", commit: data.latest });
