@@ -5,6 +5,7 @@ import { ErrorNotice } from "./ui";
 
 export function CorePanel({ id }: { id: string }) {
   const client = useQueryClient();
+  const [saved, setSaved] = useState(false);
   const [editing, setEditing] = useState(false),
     [draft, setDraft] = useState<any>(),
     [detail, setDetail] = useState<any>(),
@@ -49,9 +50,24 @@ export function CorePanel({ id }: { id: string }) {
           method: "PUT",
           body: { version: d.focus.version, profile: draft },
         },
-        { onSuccess: () => setEditing(false) },
+        {
+          onSuccess: () => {
+            setEditing(false);
+            setSaved(true);
+          },
+        },
       );
     };
+  const saveButton = (
+    <button
+      type="button"
+      className="button primary"
+      disabled={action.isPending}
+      onClick={save}
+    >
+      {action.isPending ? "Saving…" : "Save focus changes"}
+    </button>
+  );
   return (
     <section className="settings-card core-panel" style={{ margin: "16px 0" }}>
       <h2>Research focus and related work</h2>
@@ -63,6 +79,8 @@ export function CorePanel({ id }: { id: string }) {
       <button
         className="button secondary"
         onClick={() => {
+          setSaved(false);
+          action.reset();
           setDraft(structuredClone(d.focus.profile));
           setEditing(!editing);
         }}
@@ -78,8 +96,21 @@ export function CorePanel({ id }: { id: string }) {
       >
         Search / resume
       </button>
+      {saved && (
+        <p role="status">
+          Focus changes saved. You can now start Deep refresh or Search /
+          resume.
+        </p>
+      )}
       {editing && draft && (
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+          <div>
+            {saveButton}
+            <p>
+              Changes are not saved automatically. Save focus changes applies
+              all edits in this editor.
+            </p>
+          </div>
           <label>
             Research question
             <textarea
@@ -153,6 +184,10 @@ export function CorePanel({ id }: { id: string }) {
               }
             />
           </label>
+          <div>
+            {saveButton}
+            {action.error && <ErrorNotice error={action.error} />}
+          </div>
           <label>
             Contribution facets (one per line)
             <textarea
@@ -212,13 +247,7 @@ export function CorePanel({ id }: { id: string }) {
             Audit early decisions every three days and deeper readings monthly,
             02:00–06:00 in this timezone
           </label>
-          <button
-            className="button secondary"
-            disabled={action.isPending}
-            onClick={save}
-          >
-            Save versioned focus
-          </button>
+          {saveButton}
         </div>
       )}
       {action.error && <ErrorNotice error={action.error} />}
