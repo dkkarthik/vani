@@ -78,3 +78,21 @@ test("snapshot comparison separates new retrieval from feedback and flags a chan
     /same collection/,
   );
 });
+
+test("rediscovered uploaded seeds are visible but excluded from new candidate counts", () => {
+  const data = input();
+  data.members[0].doi = null;
+  data.candidates.push({
+    ...data.candidates[0],
+    id: "seed-hit",
+    paper: { title: "SEED", doi: "10.1/published-seed" },
+  });
+  const r = makeReport(data);
+  assert.equal(r.summary.retrieved, 2);
+  assert.equal(r.summary.seedMatches, 1);
+  assert.equal(r.summary.newCandidateRecords, 1);
+  assert.equal(r.candidates[1].seedMatch, true);
+  assert.match(markdownReport(r), /Existing collection paper: seed match/);
+  data.members[0].doi = "10.1/different";
+  assert.equal(makeReport(data).summary.seedMatches, 0);
+});

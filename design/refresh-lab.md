@@ -28,3 +28,12 @@ from a tiny demonstration set. A user can supply missed papers for future runs.
 The first evaluation using the user's papers must wait for their attachments.
 Validate infrastructure with disposable fixtures and live provider queries, clearly
 separating that smoke test from evidence of relevance quality.
+
+## Seed rediscovery in evaluation reports
+
+Keep retrieved seed records in the audit trail, but label exact normalized DOI/title
+matches to existing members and explicit anchors. Exclude those matches from the
+new-candidate-record count. When both records have different DOIs, do not merge by
+title alone. This report annotation does not change ranking, admission, or human
+labels. Publication/preprint versions can remain separate records and require
+review; do not present the count as unique new scientific works.

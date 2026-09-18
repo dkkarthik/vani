@@ -8,9 +8,21 @@ const doi = (s) =>
     .toLowerCase()
     .replace(/^https?:\/\/(?:dx\.)?doi\.org\//, "")
     .trim();
+const samePaper = (a, b) =>
+  a.doi && b.doi
+    ? doi(a.doi) === doi(b.doi)
+    : Boolean(norm(a.title)) && norm(a.title) === norm(b.title);
 export function makeReport(data) {
   const candidates = data.candidates.map((c) => ({
     ...c,
+    knownMember: data.members.some(
+      (m) => m.id === c.work_id || samePaper(c.paper, m),
+    ),
+    seedMatch: data.members.some(
+      (m) =>
+        data.focus.profile.anchors.some((a) => a.workId === m.id) &&
+        (m.id === c.work_id || samePaper(c.paper, m)),
+    ),
     retrievalReason: c.paths
       .map(
         (p) =>
@@ -47,6 +59,8 @@ export function makeReport(data) {
     generatedAt: new Date().toISOString(),
     summary: {
       retrieved: candidates.length,
+      seedMatches: candidates.filter((c) => c.seedMatch).length,
+      newCandidateRecords: candidates.filter((c) => !c.knownMember).length,
       accepted: candidates.filter((c) => c.accepted).length,
       judged: candidates.filter((c) => c.feedback?.label).length,
       stageCounts: candidates.reduce(
@@ -61,6 +75,7 @@ export function makeReport(data) {
     },
     limitations: [
       "Retrieved candidates are not automatically accepted collection members.",
+      "New candidate records exclude matched existing members; unresolved preprint/publication versions may still be counted separately.",
       "Metadata-only candidates have no verified semantic relevance. Scores are not calibrated probabilities.",
       "Expected-paper matches use exact normalized DOI/title; unresolved versions may require manual review. This is not global literature recall.",
       ...(!data.focus.profile.anchors.length
@@ -83,7 +98,7 @@ export function markdownReport(r) {
     `Question: ${line(r.focus.profile.question)}`,
     `Public queries: ${r.focus.profile.publicQueries.map(line).join("; ")}`,
     "",
-    `Retrieved: ${r.summary.retrieved}; accepted: ${r.summary.accepted}; human-reviewed: ${r.summary.judged}`,
+    `Retrieved records: ${r.summary.retrieved}; seed matches: ${r.summary.seedMatches}; new candidate records: ${r.summary.newCandidateRecords}; accepted: ${r.summary.accepted}; human-reviewed: ${r.summary.judged}`,
     `Expected-paper hits: ${r.summary.expectedFound}/${r.summary.expectedTotal} (seeds excluded).`,
     "",
     ...r.limitations.map((s) => "- " + s),
@@ -110,6 +125,7 @@ export function markdownReport(r) {
       `ID: ${c.id}`,
       `DOI: ${line(c.paper.doi)}`,
       `Stage: ${c.stage}/${c.state}; proximity: ${c.proximity}`,
+      `Existing collection paper: ${c.seedMatch ? "seed match" : c.knownMember ? "member match" : "not matched"}`,
       `Retrieved via: ${line(c.retrievalReason)}`,
       `Assessment: ${JSON.stringify(c.assessment)}`,
       `Human feedback: ${JSON.stringify(c.feedback)}`,

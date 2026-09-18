@@ -114,3 +114,31 @@ attempt's schema error remains in invocation history, followed by successful
 attempts after the fix. This bounded smoke run used no user-supplied seed papers
 and does not establish D2/D3 relevance quality. The fixture integration test covers
 those stage transitions separately.
+
+## Seed-paper evaluation observations
+
+The first three-PDF evaluation exposed filename-only titles and empty abstracts
+after upload. For the assisted run, the operator corrected titles/abstracts from
+the supplied first pages through the metadata API; the uncorrected state was
+preserved privately. This is not an unattended PDF-to-discovery success.
+
+The discovery pool also rediscovered uploaded seeds as public records. Reports
+now mark matched seeds/members and exclude them from the new-candidate-record
+count. Different publication versions can still occupy separate records. This
+annotation does not suppress evidence of duplicate retrieval or silently alter
+model selection.
+
+Remaining evaluation targets include automatic seed metadata extraction,
+column-aware PDF text for synthesis, resolving uploaded bibliographies into
+citation anchors, filtering supplementary-file records, and version-aware
+deduplication before spending deep-reading budget. The local private report
+records the actual run settings, operator interventions, and result limits.
+
+The initial seeded run retrieved and embedded 1,338 candidate records from 1,600
+provider records. It selected 24 for screening but completed only two D1
+assessments, both rediscovered seeds, before the first D2 comparison timed out
+and paused the run. A selected count is not a completed-assessment count. The
+operator's review shortlist and separately downloaded public PDFs must not be
+reported as completed automated D2/D3 results. Follow-up should suppress seed
+rediscovery before selection, complete broad screening before long comparisons,
+and checkpoint candidate failures without concealing them or blocking all peers.
