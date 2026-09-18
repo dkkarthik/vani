@@ -1,3 +1,4 @@
+import { UpdateNotice } from "./components/Updates";
 import { lazy, Suspense } from 'react';
 const PlanningPage=lazy(()=>import('./planning/PlanningPage').then(m=>({default:m.PlanningPage})));
 const InsightSourcePage=lazy(()=>import('./planning/Reports').then(m=>({default:m.InsightSourcePage})));
@@ -41,6 +42,7 @@ export function App(){
       <header className="context-bar">
         <div className="context-title"><span>{location.pathname.split('/')[1]||'collections'}</span><strong>{active?.name??'All research'}</strong></div>
         <div className="context-actions">
+          <UpdateNotice/>
           <label className="collection-select"><span>Scope</span><select aria-label="Active collection" value={collectionId??''} onChange={e=>setCollectionId(e.target.value||undefined)}><option value="">All library</option>{collections?.items.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
           <div className="selection-pill" title="Selected papers"><FileText size={14}/>{selected.length} selected</div>
           <NavLink className="icon-button" aria-label="Search" to="/search"><Search size={17}/></NavLink>

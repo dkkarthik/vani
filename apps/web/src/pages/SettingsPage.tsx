@@ -1,3 +1,4 @@
+import { Updates } from "../components/Updates";
 import { CaptureSettings } from "../components/CaptureSettings";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -28,6 +29,7 @@ export function SettingsPage() {
         title="Settings"
         description="VANI keeps research data on this machine and makes every external boundary explicit."
       />
+      <Updates />
       {health.isLoading ? (
         <Loading />
       ) : health.error ? (

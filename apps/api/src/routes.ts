@@ -1,3 +1,4 @@
+import { registerUpdates } from "./updates.js";
 import { registerConversations } from "./core/conversations.js";
 import { registerCore } from "./core/routes.js";
 import { registerDeepRefresh } from "./deep-refresh.js";
@@ -79,6 +80,7 @@ export async function registerRoutes(
   repository: Repository,
 ) {
   const objects = new ObjectStore();
+  await registerUpdates(app);
   await registerIngestion(app, repository);
   await registerCollectionFocus(app);
   await registerDeepRefresh(app, repository);

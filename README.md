@@ -167,3 +167,5 @@ The authoritative release gate is [docs/11-acceptance-tests.md](docs/11-acceptan
 
 Seeded refresh recovery, PDF repair, and daily desktop upgrade steps are documented
 in [the refresh reliability guide](docs/25-refresh-reliability.md).
+
+Managed Ubuntu installations support [updates from Settings](docs/26-ui-updates.md), with GitHub update notices, database backup and restart.

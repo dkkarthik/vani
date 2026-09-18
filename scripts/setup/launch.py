@@ -7,6 +7,7 @@ from ubuntu import APP, STATE, CONFIG, PREFIX, env_data, runtime_env, postgres_e
 def main():
     settings=env_data(CONFIG);validate_settings(settings)
     env=runtime_env(settings)
+    env.update({'VANI_INSTALL_ROOT':str(STATE),'VANI_UPDATE_PYTHON':sys.executable})
     children=[];logs=[];stopping=False
     def stop(*_):
         nonlocal stopping

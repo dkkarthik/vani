@@ -249,6 +249,8 @@ def snapshot():
             shutil.copytree(path,staging/path.name,ignore=shutil.ignore_patterns('node_modules','dist','.env','__pycache__','*.pyc'))
         elif path.is_file() and (path.suffix in ('.json','.js','.mjs') or path.name=='.npmrc'):
             shutil.copy2(path,staging/path.name)
+    from update import record_identity
+    record_identity(ROOT, staging)
     private_write(staging/'.vani-owned','rootless-v1')
     previous=STATE/'app-previous'
     if previous.exists(): shutil.rmtree(previous)
