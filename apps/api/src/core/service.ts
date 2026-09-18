@@ -1,3 +1,4 @@
+import { SourceRateLimit, retryTime } from "./rate-limits.js";
 import {
   eligibleCandidates,
   diverseScreening,
@@ -267,6 +268,13 @@ export async function stageCandidate(run: any, paper: any, path: any) {
   });
 }
 async function oa(params: Record<string, string>, path = "") {
+  const cooldown = (
+    await pool.query(
+      "SELECT * FROM core_source_cooldown WHERE source='openalex'",
+    )
+  ).rows[0];
+  if (cooldown && new Date(cooldown.next_attempt_at).getTime() > Date.now())
+    throw new SourceRateLimit(new Date(cooldown.next_attempt_at));
   const url = new URL("https://api.openalex.org/works" + path);
   for (const [key, value] of Object.entries(params))
     url.searchParams.set(key, value);
@@ -279,10 +287,24 @@ async function oa(params: Record<string, string>, path = "") {
     signal: AbortSignal.timeout(12000),
     headers: { "User-Agent": "VANI/1.0" },
   });
+  if (response.status === 429) {
+    const retryAt = retryTime(
+      response.headers,
+      Number(cooldown?.failures ?? 0),
+    );
+    await pool.query(
+      "INSERT INTO core_source_cooldown(source,next_attempt_at,failures) VALUES('openalex',$1,1) ON CONFLICT(source) DO UPDATE SET next_attempt_at=GREATEST(core_source_cooldown.next_attempt_at,$1),failures=core_source_cooldown.failures+1",
+      [retryAt],
+    );
+    throw new SourceRateLimit(retryAt);
+  }
   if (!response.ok)
     throw Error(
       `OpenAlex HTTP ${response.status}; check source credentials or retry.`,
     );
+  await pool.query(
+    "UPDATE core_source_cooldown SET failures=0,next_attempt_at=now() WHERE source='openalex'",
+  );
   return response.json() as Promise<any>;
 }
 async function discoveryStep(run: any) {
@@ -456,6 +478,18 @@ async function discoveryStep(run: any) {
       ],
     );
   } catch (error) {
+    if (error instanceof SourceRateLimit) {
+      await pool.query(
+        "UPDATE core_run SET frontier=$2,status='running',error=$3,next_attempt_at=$4,updated_at=now() WHERE id=$1 AND status<>'superseded'",
+        [
+          run.id,
+          JSON.stringify([task, ...run.frontier.slice(1)]),
+          error.message,
+          error.retryAt,
+        ],
+      );
+      return;
+    }
     if (Number(task.retries ?? 0) < 2)
       tasks.push({ ...task, retries: Number(task.retries ?? 0) + 1 });
     const any = (
@@ -1185,12 +1219,12 @@ export async function runCoreWorker() {
     if (!locked) return;
     const run = (
       await pool.query(
-        "SELECT r.* FROM core_run r JOIN core_focus f ON f.collection_id=r.collection_id WHERE r.status IN ('queued','running') AND r.focus_version=f.version ORDER BY r.updated_at LIMIT 1",
+        "SELECT r.* FROM core_run r JOIN core_focus f ON f.collection_id=r.collection_id WHERE r.status IN ('queued','running') AND r.next_attempt_at<=now() AND r.focus_version=f.version ORDER BY r.updated_at LIMIT 1",
       )
     ).rows[0];
     if (!run) return;
     await pool.query(
-      "UPDATE core_run SET status='running',updated_at=now() WHERE id=$1",
+      "UPDATE core_run SET status='running',error=NULL,updated_at=now() WHERE id=$1",
       [run.id],
     );
     try {

@@ -318,3 +318,69 @@ it.skipIf(!enabled)(
     ).toBe(0);
   },
 );
+it.skipIf(!enabled)(
+  "retains rate-limited discovery tasks and resumes only after the persisted cooldown",
+  async () => {
+    await pool.query(
+      "DELETE FROM core_source_cooldown WHERE source='openalex'",
+    );
+    const c = await collection();
+    const run = await enqueueDeepRefresh(c.id);
+    const task = {
+      source: "openalex",
+      query: "robot navigation",
+      cursor: "*",
+      pages: 0,
+    };
+    await pool.query("UPDATE core_run SET frontier=$2 WHERE id=$1", [
+      run.id,
+      JSON.stringify([task]),
+    ]);
+    const fetcher = vi.fn(
+      async () =>
+        new Response("rate limited", {
+          status: 429,
+          headers: { "Retry-After": "120" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    try {
+      await runCoreWorker();
+      const waiting = await state(run.id);
+      expect(waiting.frontier).toEqual([task]);
+      expect(waiting.status).toBe("running");
+      expect(waiting.error).toContain("retry automatically");
+      expect(new Date(waiting.next_attempt_at).getTime()).toBeGreaterThan(
+        Date.now() + 100000,
+      );
+      await enqueueDeepRefresh(c.id);
+      await runCoreWorker();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      // Making the run due cannot bypass the shared source cooldown.
+      await pool.query(
+        "UPDATE core_run SET next_attempt_at=now() WHERE id=$1",
+        [run.id],
+      );
+      await runCoreWorker();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await pool.query(
+        "UPDATE core_source_cooldown SET next_attempt_at=now() WHERE source='openalex'",
+      );
+      await pool.query(
+        "UPDATE core_run SET next_attempt_at=now() WHERE id=$1",
+        [run.id],
+      );
+      fetcher.mockImplementation(async () =>
+        Response.json({ results: [], meta: {} }),
+      );
+      await runCoreWorker();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect((await state(run.id)).frontier).toEqual([]);
+      expect((await state(run.id)).error).toBeNull();
+    } finally {
+      await pool.query(
+        "DELETE FROM core_source_cooldown WHERE source='openalex'",
+      );
+    }
+  },
+);

@@ -112,3 +112,29 @@ custom smaller budgets remain unchanged. It preserves historical assessments and
 feedback, supersedes affected active runs, and marks candidates for reassessment.
 After upgrading, click Deep refresh to begin under the new budgets, or wait for
 the next enabled daily refresh. Original run snapshots remain unchanged.
+
+## OpenAlex HTTP 429
+
+429 means a request-rate or daily-budget limit, not a problem with your public
+queries. Core discovery now retains its current search cursor and schedules a
+retry. It honors Retry-After, and the daily-reset header when remaining budget is
+zero. Without timing headers it backs off exponentially. Cooldown is shared across
+core discovery runs and survives restart; repeated refresh clicks do not bypass it.
+A waiting run stays active, showing its retry time. Other local work can continue.
+Other non-core OpenAlex connector paths do not yet share this cooldown.
+
+For broader searches, obtain a free key at https://openalex.org/settings/api and
+add it to your existing `<install>/config/vani.env`:
+
+```dotenv
+OPENALEX_API_KEY=your_key_here
+```
+
+Restart VANI after editing configuration. Do not put the key in public queries,
+commit it to Git, or paste it into a support conversation. An API key raises the
+keyless allowance but does not eliminate rate limits. For a previously paused
+refresh, install this fix and click Search / resume. Tasks already discarded by
+older versions are not reconstructed by the migration.
+
+Official guidance: https://help.openalex.org/api/authentication/ and
+https://help.openalex.org/api/errors/.
