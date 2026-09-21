@@ -1,3 +1,4 @@
+import { feedbackAdjustment, feedbackContext } from "./review.js";
 import {
   beginAttempt,
   finishAttempt,
@@ -258,6 +259,10 @@ export async function stageCandidate(run: any, paper: any, path: any) {
         ],
       )
     ).rows[0];
+    await db.query(
+      "UPDATE core_run_candidate SET retrieved=true,paths=(SELECT jsonb_agg(DISTINCT x) FROM jsonb_array_elements(paths||$3::jsonb) x) WHERE run_id=$1 AND candidate_id=$2",
+      [run.id, candidate.id, JSON.stringify([path])],
+    );
     for (const [kind, url, predicate] of [
       [
         "project",
@@ -690,6 +695,23 @@ async function rankStep(run: any) {
     await vector(run.snapshot.question, run.collection_id),
     policy ?? defaultWeights,
   );
+  const examples = (
+    await pool.query(
+      "SELECT id,paper,feedback FROM core_candidate WHERE collection_id=$1 AND feedback->>'label' IN ('closest','related','out_of_scope') ORDER BY updated_at DESC LIMIT 100",
+      [run.collection_id],
+    )
+  ).rows;
+  const adjustments = new Map<string, any>();
+  for (const r of ranked) {
+    const feedback = feedbackAdjustment(r.paper, examples);
+    adjustments.set(r.paper.id, {
+      baselineScore: r.score,
+      feedbackAdjustment: feedback.adjustment,
+      feedbackInfluences: feedback.influences,
+    });
+    r.score = Math.max(0, Math.min(1, r.score + feedback.adjustment));
+  }
+  ranked.sort((a, b) => b.score - a.score);
   const screeningLimit = Math.min(ranked.length, run.snapshot.budgets.d1);
   const coverageSelection = diverseScreening(
     ranked,
@@ -748,6 +770,7 @@ async function rankStep(run: any) {
         r.paper.id,
         JSON.stringify({
           ...r.features,
+          ...adjustments.get(r.paper.id),
           score: r.score,
           selectionReason:
             coverageSelection.find((x) => x.item.paper.id === r.paper.id)
@@ -1140,6 +1163,7 @@ async function readingStep(run: any) {
           objective: run.snapshot.objective,
           facets: run.snapshot.facets,
           exclusions: run.snapshot.exclusions,
+          researcherPreferences: await feedbackContext(run.collection_id),
           paper: sources[0],
         },
         Screen,
@@ -1169,7 +1193,15 @@ async function readingStep(run: any) {
         Number(counts.d2 ?? 0) < run.snapshot.budgets.d2;
       await pool.query(
         "UPDATE core_candidate SET state=$2,stage=CASE WHEN $3 THEN 'D2' ELSE stage END,attempts=0,last_error=NULL WHERE id=$1",
-        [c.id, next ? "pending" : "needs_evidence", next],
+        [
+          c.id,
+          next
+            ? "pending"
+            : result.value.likelyRelated
+              ? "deferred"
+              : "reviewed",
+          next,
+        ],
       );
       if (next)
         await pool.query(

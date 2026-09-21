@@ -1,3 +1,4 @@
+import { registerReview } from "./review.js";
 import { computeSummary } from "./compute.js";
 import { escalationPacket, escalate } from "./escalation.js";
 import { importArticle } from "./articles.js";
@@ -196,6 +197,7 @@ export function bindModelPersistence() {
   );
 }
 export async function registerCore(app: FastifyInstance) {
+  await registerReview(app);
   app.addHook("onRequest", async (request) => {
     if (request.method !== "GET" && !request.url.includes("/core/audits"))
       markInteractive();
@@ -416,16 +418,30 @@ export async function registerCore(app: FastifyInstance) {
             "duplicate",
             "already_known",
             "low_priority",
+            "clear",
           ]),
-          reason: z.string().min(2).max(2000),
+          runId: Id.optional(),
+          reason: z.string().max(2000).default(""),
         })
         .parse(r.body);
     const judgment = { ...d, origin: "human", at: new Date().toISOString() };
     const c = await transaction(async (db) => {
+      if (
+        d.runId &&
+        !(
+          await db.query(
+            "SELECT 1 FROM core_run_candidate WHERE run_id=$1 AND candidate_id=$2",
+            [d.runId, id],
+          )
+        ).rowCount
+      )
+        throw Object.assign(Error("Paper not found in refresh."), {
+          statusCode: 404,
+        });
       const row = (
         await db.query(
           "UPDATE core_candidate SET feedback=$2,updated_at=now() WHERE id=$1 RETURNING id",
-          [id, JSON.stringify(judgment)],
+          [id, JSON.stringify(d.label === "clear" ? {} : judgment)],
         )
       ).rows[0];
       if (row)

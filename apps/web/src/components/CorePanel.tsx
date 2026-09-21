@@ -1,3 +1,4 @@
+import { RefreshReview } from "./RefreshReview";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { request, api } from "../api";
@@ -80,6 +81,7 @@ export function CorePanel({ id }: { id: string }) {
         Reading ceilings per refresh: {d.focus.profile.budgets.d2} targeted
         comparisons · {d.focus.profile.budgets.d3} deep readings.
       </p>
+      <RefreshReview id={id} />
       <button
         className="button secondary"
         onClick={() => {
