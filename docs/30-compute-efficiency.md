@@ -122,3 +122,22 @@ Private packets and full outputs remain in the debug run directory and the
 Git-ignored laptop diagnostics directory. The production source checkout's local
 `package-lock.json` change was preserved; deployment used a clean sibling worktree.
 The locomotion reading run remains held for explicit review, while VANI stays up.
+
+## Final rollout verification
+
+The resumed rollout installed clean revision `e270fc4` on quasar. Regression run
+`293f0063687247b7b39a044fc0c3c010` passed 166 API tests, 18 web tests,
+14 extension tests, 38 installer tests, 20 debugger tests and 10 report/replay/proxy
+tests, plus builds, typechecks and lint. The normal installer completed its database
+backup, migration check and restart with no missing dependencies or host blockers.
+
+Post-deployment checks confirmed the installed commit and clean identity, HTTP
+health `ok`, a protected locomotion pause (`held: true`), working compute-summary
+endpoints, and 0% GPU utilization (41 MiB allocated). GoLF remained awaiting
+evidence. The original source checkout's local lockfile change remains untouched.
+
+The compute dashboard starts recording with this upgrade; it does not reconstruct
+raw outputs or costs for legacy attempts. Sandbox replay results live in their
+private reports and do not count as production collection assessments. Refresh the
+collection page to see the controls. Use **Start next measured wave** only when
+ready to evaluate another bounded batch; the existing pause is intentionally kept.
