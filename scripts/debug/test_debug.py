@@ -54,6 +54,14 @@ class DebugTests(unittest.TestCase):
    self.assertEqual([c[-1] for c in calls],['stop','start'])
    self.assertFalse(runner.read(self.root/'maintenance.json')['active'])
   finally:job.log.close()
+ def test_restore_retries_old_launcher_port_conflict(self):
+  job=self.job();(self.install/'logs').mkdir();(self.install/'logs/supervisor.log').write_text('[Errno 98] Address already in use')
+  try:
+   with patch.object(job,'step',side_effect=[RuntimeError('startup'),None]) as step,patch.object(runner.time,'sleep') as sleep:
+    job.restore_production()
+   self.assertEqual(step.call_count,2);sleep.assert_called_once_with(35)
+   self.assertNotIn('OLLAMA_BASE_URL',step.call_args.args[3])
+  finally:job.log.close()
  def test_maintenance_leaves_previously_stopped_production_stopped(self):
   job=self.job();calls=[];job.step=lambda *a,**kw:calls.append(a)
   try:
@@ -141,5 +149,20 @@ class IntegrityTests(unittest.TestCase):
   self.assertTrue(runner.recover(self.root,self.install)['recovered'])
   self.assertFalse(runner.read(self.root/'maintenance.json')['active'])
   self.assertTrue(runner.load_job(self.root,job.id)['recovered'])
+
+
+class RemoteTransportTests(unittest.TestCase):
+ def test_shell_startup_noise_preserves_json_and_binary(self):
+  spec=importlib.util.spec_from_file_location('debug_controller',pathlib.Path(__file__).parents[1]/'debug.py')
+  controller=importlib.util.module_from_spec(spec);spec.loader.exec_module(controller)
+  with tempfile.TemporaryDirectory() as directory:
+   ssh=pathlib.Path(directory)/'ssh'
+   ssh.write_text("#!/bin/sh\nprintf 'Agent pid 123\\n'\nexec /bin/sh -c \"$2\"\n")
+   ssh.chmod(0o700)
+   result=controller.remote_command([str(ssh)],'host',[sys.executable,'-I','-c','print(\'{"ok":true}\')'],capture_output=True,text=True)
+   self.assertEqual(json.loads(result.stdout),{'ok':True})
+   stream=io.BytesIO()
+   controller.remote_command([str(ssh)],'host',[sys.executable,'-I','-c','import sys;sys.stdout.buffer.write(bytes(range(256)))'],stdout=stream)
+   self.assertEqual(stream.getvalue(),bytes(range(256)))
 
 if __name__=='__main__':unittest.main()

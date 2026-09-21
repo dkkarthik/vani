@@ -30,7 +30,9 @@ def main():
         profile=(STATE/'profile').read_text().strip()
         ports=[55432,int(settings['VANI_API_PORT']),3000]+([11435] if profile!='app' else [])
         for port in ports:
-            with socket.socket() as probe: probe.bind(('127.0.0.1',port))
+            with socket.socket() as probe:
+                probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+                probe.bind(('127.0.0.1',port))
         if not (STATE/'postgres/.vani-owned').exists(): raise RuntimeError('Managed PostgreSQL cluster is missing.')
         private_write(STATE/'run.pid',str(os.getpid()))
         (STATE/'run.ready').unlink(missing_ok=True)

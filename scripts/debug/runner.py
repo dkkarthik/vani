@@ -66,7 +66,7 @@ def environment(root, install):
     env={k:os.environ[k] for k in keep if k in os.environ}
     env.update(PATH=os.pathsep.join([str(install/'runtime/node/bin'),str(install/'runtime/deps/bin'),os.environ.get('PATH','/usr/bin:/bin')]),
         TMPDIR=str(root/'tmp'),PYTHONDONTWRITEBYTECODE='1',NODE_ENV='test',VANI_CLOUD_MODE='off',VANI_DEMO_MODE='false',
-        npm_config_cache=str(root/'runtime/npm-cache'),OLLAMA_NO_CLOUD='1')
+        npm_config_cache=str(root/'runtime/npm-cache'),PLAYWRIGHT_BROWSERS_PATH=str(root/'runtime/browsers'),OLLAMA_NO_CLOUD='1')
     return env
 
 def private_command(argv, env, cwd, log, timeout=3600, hidden=(), process_record=None):
@@ -108,7 +108,9 @@ def private_command(argv, env, cwd, log, timeout=3600, hidden=(), process_record
         if process_record:process_record.unlink(missing_ok=True)
 
 def port_free(port):
-    with socket.socket() as probe: probe.bind(('127.0.0.1',port))
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        probe.bind(('127.0.0.1',port))
 
 def get_json(url):
     with urllib.request.urlopen(url,timeout=15) as response:return json.load(response)
@@ -145,6 +147,17 @@ class Job:
             yield test_env
         finally:
             if (cluster/'postmaster.pid').exists():self.step('Stop isolated PostgreSQL',['pg_ctl','-D',cluster,'-m','fast','-w','stop'],env=env)
+    def restore_production(self):
+        # Older installed launchers can mistake TIME_WAIT for a live listener.
+        for attempt in range(3):
+            try:
+                self.step('Restore production after GPU maintenance',[self.install/'bin/vani','start'],240,environment(self.root,self.install))
+                return
+            except RuntimeError:
+                log=self.install/'logs/supervisor.log'
+                if attempt==2 or not log.exists() or 'Address already in use' not in log.read_text()[-2048:]:raise
+                self.log.write('Production port conflict; retrying startup in 35 seconds.\n')
+                time.sleep(35)
     @contextlib.contextmanager
     def maintenance(self):
         if not self.meta['maintenance']: raise RuntimeError('GPU jobs require --maintenance to avoid competing with production.')
@@ -159,7 +172,7 @@ class Job:
             if restore:self.step('Stop production for GPU maintenance',[control,'stop'],180)
             yield
         finally:
-            if restore:self.step('Restore production after GPU maintenance',[control,'start'],240)
+            if restore:self.restore_production()
             write(journal,{'jobId':self.id,'active':False,'restoreProduction':False})
     @contextlib.contextmanager
     def model(self):
@@ -223,6 +236,9 @@ class Job:
                 self.step('Debug infrastructure tests',[sys.executable,'-m','unittest','discover','-s','scripts/debug','-p','test_*.py'],600,env)
                 self.step('Report and proxy tests',['node','--test','scripts/refresh-lab/report.test.mjs','scripts/diagnostics/remote.test.mjs','scripts/web-network.test.mjs'],600,env)
             return
+        if kind=='browser':
+            self.step('Install sandbox Chromium',['node','node_modules/playwright/cli.js','install','chromium','--only-shell'],600)
+            self.step('Verify browser dependencies before maintenance',['node','--input-type=module','-e',"import {chromium} from 'playwright';const b=await chromium.launch({headless:true});await b.close();"],60)
         with self.maintenance(),self.model():
             self.step('Actual local-model smoke test',['node','scripts/local-model-smoke.mjs'],900)
             if kind in ('lab','soak','browser'):self.lab(kind=='soak',kind=='browser')
@@ -311,7 +327,7 @@ def recover(root,install):
                 journal=read(root/'maintenance.json',{})
                 if journal.get('active') and journal.get('restoreProduction'):
                     if journal.get('install')!=str(install):raise RuntimeError('Recovery installation path mismatch.')
-                    job.step('Recovery: restore production',[install/'bin/vani','start'],240)
+                    job.restore_production()
                 write(root/'maintenance.json',{'active':False,'restoreProduction':False})
                 if job.meta['state'] in ('queued','running'):job.save(state='interrupted',message='Recovered; run may be retried.',recovered=True)
             finally:job.log.close()

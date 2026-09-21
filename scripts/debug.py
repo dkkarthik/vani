@@ -1,7 +1,27 @@
 #!/usr/bin/env python3
 """Control a dedicated VANI debugging workspace over SSH. No remote HTTP shell."""
-import argparse, json, pathlib, re, shlex, subprocess, sys, tarfile, tempfile
+import argparse, json, pathlib, re, shlex, subprocess, sys, tarfile, tempfile, uuid
 ROOT=pathlib.Path(__file__).resolve().parents[1]
+
+def remote_command(ssh, host, argv, **kwargs):
+    # Login shells may print banners or ssh-agent output before our command.
+    # Frame stdout so both JSON responses and binary report archives stay intact.
+    marker=('VANI_DEBUG_OUTPUT_'+uuid.uuid4().hex+'\n').encode()
+    command='printf %s '+shlex.quote(marker.decode())+'; exec '+shlex.join([str(x) for x in argv])
+    capture=kwargs.pop('capture_output',False);destination=kwargs.pop('stdout',None)
+    as_text=kwargs.pop('text',False)
+    result=subprocess.run(ssh+[host,command],check=True,stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE if capture else None,**kwargs)
+    if marker not in result.stdout:raise RuntimeError('Remote debug response framing missing.')
+    result.stdout=result.stdout.split(marker,1)[1]
+    if as_text:
+        result.stdout=result.stdout.decode()
+        if result.stderr is not None:result.stderr=result.stderr.decode()
+    if not capture:
+        if destination is not None:destination.write(result.stdout)
+        elif as_text:sys.stdout.write(result.stdout)
+        else:sys.stdout.buffer.write(result.stdout)
+    return result
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -19,7 +39,7 @@ def main():
     def remote(argv,**kwargs):
         argv=list(argv)
         if argv[0]==a.python:argv.insert(1,'-I')
-        return subprocess.run(ssh+[a.host,shlex.join([str(x) for x in argv])],check=True,**kwargs)
+        return remote_command(ssh,a.host,argv,**kwargs)
     if a.action=='tunnel':
         subprocess.run(ssh+['-o','ExitOnForwardFailure=yes','-N','-L',f'127.0.0.1:{a.local_port}:127.0.0.1:18082',a.host],check=True);return
     if a.action=='deploy':

@@ -2,7 +2,8 @@
 
 This system uses SSH keys and a dedicated debug workspace. It adds **no network
 command-execution endpoint** and makes **no GoLF focus or membership changes**.
-Production stays at `/data/install/vani`; debugging defaults to
+Production source stays at `/data/projects/vani` and the installation stays at
+`/data/install/vani`; debugging defaults to
 `/data/install/vani-debug`. All commands below run from the Git checkout on the
 laptop. No sudo is used.
 
@@ -10,15 +11,17 @@ laptop. No sudo is used.
 
 - VPN and key-based `ssh kdantu@quasar.cse.buffalo.edu` must work. The host key must
   already be trusted by SSH. The controller will not bypass host-key verification
-  or ask for a password.
+  or ask for a password. Shell startup output is separated from JSON and binary
+  responses, so login banners and ssh-agent messages cannot corrupt report downloads.
 - The account can create the debug directory beside the installation. Use
   `--root /another/writable/vani-debug` on every command if necessary.
 - The managed installation supplies Node/npm, PostgreSQL/pgvector, Poppler, Ollama
   and already downloaded models. The runner uses those binaries through its own
   environment, never the production DB connection or cloud credentials.
-- Quasar must have outbound npm access for sandbox builds. Browser smoke needs
-  Chrome/Chromium or Playwright's Chromium installed for the account, including its
-  OS libraries; it reports failure if these are missing and does not use sudo.
+- Quasar must have outbound npm and Playwright download access for sandbox builds.
+  Browser jobs install a pinned Chromium headless shell under the debug workspace
+  (`runtime/browsers`) and verify it launches before stopping production. Missing
+  OS libraries fail this preflight; no sudo is used.
 - Allow extra disk space for a checkout with npm dependencies, fresh test databases,
   private sandbox PDFs, reports and screenshots. Old runs are retained, not deleted
   automatically. A debug-directory permission failure is not worked around by
@@ -133,6 +136,11 @@ python3 -I scripts/debug.py recover
 
 Recovery checks recorded process ownership/identity, stops owned sandbox services,
 and restores production if the maintenance journal records that it was running.
+Older installed launchers may report a port conflict while closed sockets remain
+in TIME_WAIT. Restoration retries these failures twice at 35-second intervals;
+the updated launcher uses SO_REUSEADDR for its availability probes. A persistent
+failure keeps the maintenance journal active for explicit recovery.
+
 If identity checks fail, recovery refuses to signal an unknown process and reports
 what requires inspection. There is no automatic production database restore or
 schema rollback. Use `logs` plus the private remote run directory for diagnosis.

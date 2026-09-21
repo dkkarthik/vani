@@ -2,19 +2,12 @@ import { setTimeout, clearTimeout } from "node:timers";
 import process from "node:process";
 import console from "node:console";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 const output = resolve(process.argv[2]);
 if (!process.env.OLLAMA_BASE_URL?.endsWith(":11437"))
   throw Error("Browser job must run in the managed debug environment.");
-const binary = [
-  "/usr/bin/google-chrome",
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-].find(existsSync);
 const web = spawn(process.execPath, ["scripts/serve-local.mjs"], {
   env: {
     ...process.env,
@@ -45,7 +38,6 @@ try {
   });
   browser = await chromium.launch({
     headless: true,
-    ...(binary ? { executablePath: binary } : {}),
   });
   const page = await browser.newPage({
     viewport: { width: 1440, height: 1000 },
