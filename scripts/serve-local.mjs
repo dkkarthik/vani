@@ -1,3 +1,4 @@
+import { proxyHeaders } from "./web-network.mjs";
 import process from "node:process";
 import { URL } from "node:url";
 import console from "node:console";
@@ -5,6 +6,7 @@ import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 const root = resolve("apps/web/dist");
+const webHost = process.env.VANI_WEB_HOST ?? "0.0.0.0";
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -19,13 +21,25 @@ const types = {
 http
   .createServer(async (req, res) => {
     if (req.url.startsWith("/api/")) {
+      let headers;
+      try {
+        headers = proxyHeaders(
+          req,
+          Number(process.env.VANI_API_PORT ?? 8080),
+          process.env.VANI_WEB_PROXY_TOKEN,
+        );
+      } catch {
+        res.writeHead(403);
+        res.end("Cross-origin API requests are not allowed.");
+        return;
+      }
       const upstream = http.request(
         {
           host: "127.0.0.1",
           port: Number(process.env.VANI_API_PORT ?? 8080),
           method: req.method,
           path: req.url,
-          headers: { ...req.headers, host: "127.0.0.1:8080" },
+          headers,
         },
         (reply) => {
           res.writeHead(reply.statusCode, reply.headers);
@@ -73,8 +87,8 @@ http
       res.end("Invalid path");
     }
   })
-  .listen(Number(process.env.VANI_WEB_PORT ?? 3000), "127.0.0.1", () =>
+  .listen(Number(process.env.VANI_WEB_PORT ?? 3000), webHost, () =>
     console.log(
-      "VANI UI: http://127.0.0.1:" + Number(process.env.VANI_WEB_PORT ?? 3000),
+      `VANI UI listening on ${webHost}:${Number(process.env.VANI_WEB_PORT ?? 3000)}`,
     ),
   );

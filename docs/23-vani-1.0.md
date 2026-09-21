@@ -37,7 +37,7 @@ All VANI application data and managed runtime files live under `~/vani`, regardl
 | `logs/` | Supervisor, database, model server, API and web logs |
 | `bin/vani` | Start/stop/status command |
 
-Secrets are mode 0600; new managed directories are private. Settings are parsed as data, never sourced as shell code. The installer preserves existing managed credentials and backs up before migrations. It rejects unmanaged clusters and PostgreSQL major-version mismatches. PostgreSQL uses SCRAM authentication and binds to `127.0.0.1:55432`; UI/API/Ollama use loopback ports 3000/8080/11435. Port conflicts fail explicitly. The owned Ollama runtime disables cloud models and loads at most one model at once.
+Secrets are mode 0600; new managed directories are private. Settings are parsed as data, never sourced as shell code. The installer preserves existing managed credentials and backs up before migrations. It rejects unmanaged clusters and PostgreSQL major-version mismatches. PostgreSQL uses SCRAM authentication and binds to `127.0.0.1:55432`; the UI listens on all IPv4 interfaces at port 3000, while API/Ollama use loopback ports 8080/11435. See [LAN access](27-lan-access.md) to restrict the UI to localhost. Port conflicts fail explicitly. The owned Ollama runtime disables cloud models and loads at most one model at once.
 
 ```bash
 ~/vani/bin/vani status

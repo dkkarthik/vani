@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
@@ -23,6 +24,15 @@ export function updateGuard(request: Pick<FastifyRequest, "ip" | "headers">) {
       new Error("Updates must be requested from the local VANI UI."),
       { statusCode: 403 },
     );
+  const token = process.env.VANI_WEB_PROXY_TOKEN;
+  const supplied = request.headers["x-vani-proxy-token"];
+  if (
+    token &&
+    typeof supplied === "string" &&
+    Buffer.byteLength(token) === Buffer.byteLength(supplied) &&
+    timingSafeEqual(Buffer.from(token), Buffer.from(supplied))
+  )
+    return;
   if (request.headers.origin) {
     let allowed = false;
     try {

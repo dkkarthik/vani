@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Supervise the home installation; no system service manager required."""
-import fcntl, os, signal, socket, subprocess, sys, time
+import fcntl, os, secrets, signal, socket, subprocess, sys, time
 from ubuntu import APP, STATE, CONFIG, PREFIX, env_data, runtime_env, postgres_env, validate_settings, read_url, private_write
 
 
 def main():
     settings=env_data(CONFIG);validate_settings(settings)
     env=runtime_env(settings)
-    env.update({'VANI_INSTALL_ROOT':str(STATE),'VANI_UPDATE_PYTHON':sys.executable})
+    env.update({'VANI_INSTALL_ROOT':str(STATE),'VANI_UPDATE_PYTHON':sys.executable,'VANI_WEB_PROXY_TOKEN':secrets.token_urlsafe(32)})
     children=[];logs=[];stopping=False
     def stop(*_):
         nonlocal stopping

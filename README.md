@@ -169,3 +169,5 @@ Seeded refresh recovery, PDF repair, and daily desktop upgrade steps are documen
 in [the refresh reliability guide](docs/25-refresh-reliability.md).
 
 Managed Ubuntu installations support [updates from Settings](docs/26-ui-updates.md), with GitHub update notices, database backup and restart.
+
+Open the managed UI from your LAN at `http://<desktop-IP>:3000`. See [LAN access and local-only configuration](docs/27-lan-access.md).
