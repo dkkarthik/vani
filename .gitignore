@@ -13,3 +13,5 @@ __pycache__/
 *.pyc
 
 .vani-refresh-lab/
+
+.vani-diagnostics/
