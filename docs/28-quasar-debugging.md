@@ -155,6 +155,8 @@ Unix account.
 
 Development-host tests exercise safe deployment, root validation, environment
 isolation, locks, real detached jobs/cancellation, timeout cleanup, redaction and
-maintenance restoration. Quasar execution and 5090 acceptance remain pending until
-SSH keys work and jobs are actually run. No GoLF correction or production update
-is performed by adding these tools.
+maintenance restoration. Quasar dependency checks, full regression, actual 5090
+inference, sandbox browser rendering, SSH tunneling and a bounded health run have
+now been exercised. See [the acceptance report](29-quasar-debug-acceptance.md) for
+revision IDs, outcomes and limitations. GoLF retrieval quality and long-duration
+workload acceptance remain separate tasks.
