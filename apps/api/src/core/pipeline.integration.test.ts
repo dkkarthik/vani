@@ -260,7 +260,7 @@ it.skipIf(!enabled)(
 );
 
 it.skipIf(!enabled)(
-  "screens peers before deep reading and isolates bounded failures across restarts",
+  "prioritizes targeted readings and preserves bounded failures across refreshes",
   async () => {
     await pool.query(
       "UPDATE core_run SET status='superseded' WHERE status IN ('queued','running','paused','awaiting_evidence')",
@@ -331,6 +331,7 @@ it.skipIf(!enabled)(
         });
       }),
     );
+    await runCoreWorker(); // A targeted reading precedes more abstract screening.
     await runCoreWorker();
     let failed = (
       await pool.query("SELECT * FROM core_candidate WHERE id=$1", [bad.id])
@@ -351,7 +352,7 @@ it.skipIf(!enabled)(
     ).toBe(1);
     await runCoreWorker();
     await runCoreWorker();
-    expect(order.slice(0, 3)).toEqual([bad.id, good.id, "deep"]);
+    expect(order.slice(0, 3)).toEqual(["deep", bad.id, good.id]);
     expect(
       (await pool.query("SELECT status FROM core_run WHERE id=$1", [run.id]))
         .rows[0].status,
@@ -367,8 +368,8 @@ it.skipIf(!enabled)(
       await pool.query("SELECT * FROM core_candidate WHERE id=$1", [bad.id])
     ).rows[0];
     expect(failed.state).toBe("failed");
-    expect(failed.attempts).toBe(3);
-    expect(failed.features.readingErrors).toHaveLength(3);
+    expect(failed.attempts).toBe(2);
+    expect(failed.features.readingErrors).toHaveLength(2);
     expect(
       (await pool.query("SELECT status FROM core_run WHERE id=$1", [run.id]))
         .rows[0].status,
@@ -382,7 +383,21 @@ it.skipIf(!enabled)(
           [bad.id],
         )
       ).rows[0],
-    ).toMatchObject({ attempts: 0, state: "pending" });
+    ).toMatchObject({ attempts: 2, state: "pending" });
+    const calls = order.length;
+    await pool.query("UPDATE core_run SET phase='screening' WHERE id=$1", [
+      next.id,
+    ]);
+    await runCoreWorker();
+    await runCoreWorker();
+    expect(order).toHaveLength(calls);
+    expect(
+      (
+        await pool.query("SELECT state FROM core_candidate WHERE id=$1", [
+          bad.id,
+        ])
+      ).rows[0].state,
+    ).toBe("blocked");
     await pool.query("UPDATE core_run SET status='superseded' WHERE id=$1", [
       next.id,
     ]);

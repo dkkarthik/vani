@@ -28,7 +28,7 @@ def main():
     p.add_argument('action',choices=['deploy','run','status','logs','cancel','recover','fetch','tunnel'])
     p.add_argument('--host',default='kdantu@quasar.cse.buffalo.edu');p.add_argument('--ssh-port',type=int,default=22);p.add_argument('--identity')
     p.add_argument('--root',default='/data/install/vani-debug');p.add_argument('--install',default='/data/install/vani');p.add_argument('--python',default='python3')
-    p.add_argument('--job',choices=['doctor','snapshot','regression','model-smoke','browser','lab','soak'],default='doctor');p.add_argument('--id');p.add_argument('--maintenance',action='store_true');p.add_argument('--duration',type=int,default=3600);p.add_argument('--revision',default='HEAD');p.add_argument('--output',default='.vani-diagnostics/quasar');p.add_argument('--local-port',type=int,default=3001)
+    p.add_argument('--job',choices=['doctor','snapshot','regression','model-smoke','browser','lab','soak','replay'],default='doctor');p.add_argument('--id');p.add_argument('--maintenance',action='store_true');p.add_argument('--duration',type=int,default=3600);p.add_argument('--revision',default='HEAD');p.add_argument('--output',default='.vani-diagnostics/quasar');p.add_argument('--local-port',type=int,default=3001)
     a=p.parse_args()
     if not a.host or a.host.startswith('-') or any(c.isspace() for c in a.host):p.error('Invalid SSH host.')
     if not 1<=a.ssh_port<=65535 or not 1024<=a.local_port<=65535:p.error('Invalid port.')

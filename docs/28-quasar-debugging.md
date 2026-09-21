@@ -58,6 +58,7 @@ closing SSH. Reports include revision, steps, timestamps, exit status and log.
 | `model-smoke` | Actual local reader output/quote, embeddings and GPU residency | Explicit GPU maintenance window |
 | `browser` | Real Chromium rendering of sandbox collections/library/search/settings, screenshots and error capture | Explicit GPU maintenance window; route smoke, not all workflows |
 | `lab` | Interactive isolated refresh lab | Explicit GPU maintenance window; operator can add fixtures |
+| `replay` | Paired original/concise local-model comparison on at most five staged packets | Explicit GPU maintenance window; no production ranking changes |
 | `soak` | Bounded sandbox health sampling after real model smoke | Explicit GPU maintenance window; does not certify research quality or daily scheduling |
 
 ```bash
@@ -160,3 +161,5 @@ inference, sandbox browser rendering, SSH tunneling and a bounded health run hav
 now been exercised. See [the acceptance report](29-quasar-debug-acceptance.md) for
 revision IDs, outcomes and limitations. GoLF retrieval quality and long-duration
 workload acceptance remain separate tasks.
+
+See [compute efficiency and replay](30-compute-efficiency.md) for packet preparation and evaluation.

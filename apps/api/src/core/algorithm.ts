@@ -48,6 +48,13 @@ export const Focus = z.object({
       d3: z.number().int().min(1).max(250).default(50),
     })
     .default({ d0: 20000, d1: 2000, d2: 200, d3: 50 }),
+  compute: z
+    .object({
+      d1: z.number().int().min(1).max(200).default(40),
+      d2: z.number().int().min(1).max(100).default(10),
+      d3: z.number().int().min(1).max(50).default(3),
+    })
+    .default({ d1: 40, d2: 10, d3: 3 }),
   audits: z
     .object({
       enabled: z.boolean().default(true),
@@ -400,54 +407,88 @@ export const Assessment = z.object({
     .default([]),
 });
 export type AssessmentValue = z.infer<typeof Assessment>;
-export function validateAssessment(
+export type ValidationIssue = { code: string; path: string; message: string };
+export function assessmentIssues(
   a: AssessmentValue,
   sources: z.infer<typeof Source>[],
   candidateId: string,
   anchors: string[],
   stage: string,
   facets: string[],
-) {
-  if (
-    a.facetIds.some((id) => !facets.includes(id)) ||
-    (a.anchorId && !anchors.includes(a.anchorId))
-  )
-    return false;
-  if (
-    a.evidence.some(
-      (e) =>
-        !sources.some((s) => s.id === e.sourceId && s.text.includes(e.quote)),
-    )
-  )
-    return false;
-  if (
-    a.proximity !== "unassessed" &&
-    !a.evidence.some(
-      (e) => sources.find((s) => s.id === e.sourceId)?.workId === candidateId,
-    )
-  )
-    return false;
-  if (
-    a.relationships.some(
-      (r) =>
-        !anchors.includes(r.targetId) ||
-        r.sourceIds.some((id) => !a.evidence.some((e) => e.sourceId === id)),
-    )
-  )
-    return false;
-  if (a.proximity === "closest")
-    return (
-      (!facets.length || a.facetIds.length > 0) &&
-      ["D2", "D3"].includes(stage) &&
-      Boolean(a.anchorId) &&
-      a.evidence.some(
-        (e) => sources.find((s) => s.id === e.sourceId)?.workId === a.anchorId,
-      ) &&
-      a.evidence.some(
-        (e) => sources.find((s) => s.id === e.sourceId)?.workId === candidateId,
-      )
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const add = (code: string, path: string, message: string) =>
+    issues.push({ code, path, message });
+  a.facetIds.forEach((id, i) => {
+    if (!facets.includes(id))
+      add("unknown_facet", `facetIds.${i}`, "Use a supplied facet ID.");
+  });
+  if (a.anchorId && !anchors.includes(a.anchorId))
+    add("unknown_anchor", "anchorId", "Use a supplied anchor work ID.");
+  a.evidence.forEach((e, i) => {
+    const source = sources.find((s) => s.id === e.sourceId);
+    if (!source)
+      add(
+        "unknown_source",
+        `evidence.${i}.sourceId`,
+        "Use an exact supplied source ID.",
+      );
+    else if (!source.text.includes(e.quote))
+      add(
+        "quote_mismatch",
+        `evidence.${i}.quote`,
+        "Quotation is not a consecutive verbatim span of its source.",
+      );
+  });
+  const hasEvidence = (workId: string | null) =>
+    a.evidence.some((e) =>
+      sources.some(
+        (s) =>
+          s.id === e.sourceId &&
+          s.workId === workId &&
+          s.text.includes(e.quote),
+      ),
     );
-  return true;
+  if (a.proximity !== "unassessed" && !hasEvidence(candidateId))
+    add(
+      "missing_candidate_evidence",
+      "evidence",
+      "Supply valid evidence from the candidate.",
+    );
+  a.relationships.forEach((r, i) => {
+    if (!anchors.includes(r.targetId))
+      add(
+        "unknown_relationship_target",
+        `relationships.${i}.targetId`,
+        "Relationship target must be a supplied anchor.",
+      );
+    r.sourceIds.forEach((id, j) => {
+      if (!a.evidence.some((e) => e.sourceId === id))
+        add(
+          "uncited_relationship_source",
+          `relationships.${i}.sourceIds.${j}`,
+          "Relationship source must appear in evidence.",
+        );
+    });
+  });
+  if (a.proximity === "closest") {
+    if (facets.length && !a.facetIds.length)
+      add("missing_facet", "facetIds", "Closest requires a focal facet.");
+    if (!["D2", "D3"].includes(stage))
+      add("insufficient_depth", "proximity", "Closest requires D2 or D3.");
+    if (!a.anchorId || !hasEvidence(a.anchorId))
+      add(
+        "missing_anchor_evidence",
+        "anchorId",
+        "Closest requires an anchor and valid evidence from it.",
+      );
+  }
+  return issues;
+}
+export function validateAssessment(
+  ...args: Parameters<typeof assessmentIssues>
+) {
+  return assessmentIssues(...args).length === 0;
 }
 export function nextAudit(
   date: Date,

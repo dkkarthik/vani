@@ -1,3 +1,4 @@
+import { computeSummary } from "./compute.js";
 import { escalationPacket, escalate } from "./escalation.js";
 import { importArticle } from "./articles.js";
 import {
@@ -20,6 +21,7 @@ import {
 } from "../models/router.js";
 import { Focus } from "./algorithm.js";
 import {
+  diagnosticPacket,
   getFocus,
   saveFocus,
   enqueueCore,
@@ -246,7 +248,65 @@ export async function registerCore(app: FastifyInstance) {
         [id],
       )
     ).rows;
-    return { focus, runs, candidates, counts, audits, policies };
+    return {
+      focus,
+      runs,
+      candidates,
+      counts,
+      audits,
+      policies,
+      compute: await computeSummary(id),
+    };
+  });
+  app.post("/api/v1/collections/:id/core/control", async (r) => {
+    const id = Id.parse((r.params as any).id);
+    const { action } = z
+      .object({ action: z.enum(["pause", "resume"]) })
+      .parse(r.body);
+    return transaction(async (db) => {
+      await db.query("SELECT id FROM collection WHERE id=$1 FOR UPDATE", [id]);
+      const run = (
+        await db.query(
+          "SELECT * FROM core_run WHERE collection_id=$1 AND status IN ('running','queued','paused') ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+          [id],
+        )
+      ).rows[0];
+      if (!run)
+        throw Object.assign(Error("No active reading run."), {
+          statusCode: 409,
+        });
+      if (action === "pause") {
+        await db.query(
+          "UPDATE core_run SET status='paused',error='Paused by researcher; an in-flight call may finish.',compute_control=compute_control||'{\"held\":true}',updated_at=now() WHERE id=$1",
+          [run.id],
+        );
+      } else {
+        if (run.status !== "paused")
+          throw Object.assign(
+            Error("Pause the run before starting a new wave."),
+            { statusCode: 409 },
+          );
+        await db.query(
+          "UPDATE core_run SET status='queued',error=NULL,compute_control=jsonb_build_object('held',false,'waveStartedAt',now()),updated_at=now() WHERE id=$1",
+          [run.id],
+        );
+      }
+      return { status: action === "pause" ? "paused" : "queued" };
+    });
+  });
+  app.post("/api/v1/core/candidates/:id/diagnostic-packet", async (r) =>
+    diagnosticPacket(Id.parse((r.params as any).id)),
+  );
+  app.get("/api/v1/core/attempts/:id", async (r) => {
+    const row = (
+      await pool.query(
+        "SELECT a.*,c.feedback AS human_feedback FROM core_read_attempt a JOIN core_candidate c ON c.id=a.candidate_id WHERE a.id=$1",
+        [Id.parse((r.params as any).id)],
+      )
+    ).rows[0];
+    if (!row)
+      throw Object.assign(Error("Attempt not found."), { statusCode: 404 });
+    return row;
   });
   app.post("/api/v1/collections/:id/core/articles", async (r) =>
     importArticle(
@@ -290,7 +350,13 @@ export async function registerCore(app: FastifyInstance) {
           id,
         ])
       ).rows;
-    return { ...c, history, artifacts };
+    const attempts = (
+      await pool.query(
+        "SELECT id,stage,status,input_hash,issues,invocation,duration_ms,output_truncated,created_at,finished_at,packet ? 'input' AS replayable FROM core_read_attempt WHERE candidate_id=$1 ORDER BY created_at DESC LIMIT 20",
+        [id],
+      )
+    ).rows;
+    return { ...c, history, artifacts, attempts };
   });
   app.get("/api/v1/core/candidates/:id/escalation", async (r) => {
     const p = await escalationPacket(Id.parse((r.params as any).id));

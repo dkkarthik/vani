@@ -100,6 +100,78 @@ export function CorePanel({ id }: { id: string }) {
       >
         Search / resume
       </button>
+      {run && ["running", "queued", "paused"].includes(run.status) && (
+        <button
+          className="button secondary"
+          disabled={action.isPending}
+          onClick={() =>
+            action.mutate({
+              path: `/collections/${id}/core/control`,
+              body: { action: run.status === "paused" ? "resume" : "pause" },
+            })
+          }
+        >
+          {run.status === "paused"
+            ? "Start next measured wave"
+            : "Pause reading"}
+        </button>
+      )}
+      {d.compute && (
+        <details open>
+          <summary>Compute and reading quality</summary>
+          <p>
+            Reading waves: D1 {d.focus.profile.compute?.d1 ?? 40} · D2{" "}
+            {d.focus.profile.compute?.d2 ?? 10} · D3{" "}
+            {d.focus.profile.compute?.d3 ?? 3} calls. High failure rates pause
+            reading automatically. Search / resume does not release this hold.
+          </p>
+          <p>{d.compute.scope}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>Calls</th>
+                <th>Valid evidence</th>
+                <th>Validity</th>
+                <th>Model minutes</th>
+                <th>Minutes / valid</th>
+                <th>Output tokens</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.compute.stages.map((x: any) => (
+                <tr key={x.stage}>
+                  <td>{x.stage}</td>
+                  <td>{x.attempts}</td>
+                  <td>{x.accepted}</td>
+                  <td>
+                    {x.attempts
+                      ? Math.round((100 * x.accepted) / x.attempts)
+                      : 0}
+                    %
+                  </td>
+                  <td>{(x.duration_ms / 60000).toFixed(1)}</td>
+                  <td>
+                    {x.accepted
+                      ? (x.duration_ms / 60000 / x.accepted).toFixed(1)
+                      : "—"}
+                  </td>
+                  <td>{x.output_tokens}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {d.compute.issues.map((x: any) => (
+            <p key={x.code}>
+              {x.code}: {x.count}
+            </p>
+          ))}
+          <p>
+            Valid evidence does not guarantee relevance. Use paper feedback to
+            evaluate retrieval quality before reducing search coverage.
+          </p>
+        </details>
+      )}
       {saved && (
         <p role="status">
           Focus changes saved. You can now start Deep refresh or Search /
@@ -115,6 +187,35 @@ export function CorePanel({ id }: { id: string }) {
               all edits in this editor.
             </p>
           </div>
+          <fieldset>
+            <legend>Model calls per measured wave</legend>
+            {["d1", "d2", "d3"].map((stage) => (
+              <label key={stage}>
+                {stage.toUpperCase()}{" "}
+                <input
+                  type="number"
+                  min="1"
+                  max={stage === "d1" ? 200 : stage === "d2" ? 100 : 50}
+                  value={
+                    draft.compute?.[stage] ??
+                    ({ d1: 40, d2: 10, d3: 3 } as any)[stage]
+                  }
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      compute: {
+                        d1: 40,
+                        d2: 10,
+                        d3: 3,
+                        ...draft.compute,
+                        [stage]: Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+              </label>
+            ))}
+          </fieldset>
           <label>
             Research question
             <textarea
@@ -397,7 +498,7 @@ export function CorePanel({ id }: { id: string }) {
             )}
             {c.last_error && (
               <p role="status">
-                Reading attempt {c.attempts}/3 failed: {c.last_error}
+                Reading attempts: {c.attempts} · {c.last_error}
                 {c.state === "pending"
                   ? ` · Retry after ${new Date(c.next_attempt_at).toLocaleString()}`
                   : " · Request reading to retry."}
@@ -502,6 +603,24 @@ export function CorePanel({ id }: { id: string }) {
           >
             Close evidence
           </button>
+          {detail.attempts
+            ?.filter((a: any) => a.replayable)
+            .map((a: any) => (
+              <button
+                key={a.id}
+                className="button secondary"
+                onClick={() => {
+                  void request<any>(`/core/attempts/${a.id}`)
+                    .then((selectedAttempt) =>
+                      setDetail({ ...detail, selectedAttempt }),
+                    )
+                    .catch((e) => setDetail({ ...detail, error: String(e) }));
+                }}
+              >
+                Inspect {a.stage} {a.status} ·{" "}
+                {new Date(a.created_at).toLocaleString()}
+              </button>
+            ))}
           <pre
             style={{ whiteSpace: "pre-wrap", maxHeight: 500, overflow: "auto" }}
           >
@@ -510,6 +629,8 @@ export function CorePanel({ id }: { id: string }) {
                 title: detail.paper?.title,
                 assessment: detail.assessment,
                 history: detail.history,
+                attempts: detail.attempts,
+                selectedAttempt: detail.selectedAttempt,
                 paths: detail.paths,
                 artifacts: detail.artifacts,
                 error: detail.error,

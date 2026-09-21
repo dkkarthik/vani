@@ -31,6 +31,7 @@ export type ModelOptions = {
   timeoutMs?: number;
   approvalId?: string;
   embeddingModel?: string;
+  onDiagnostic?: (raw: string | undefined, invocation: Invocation) => void;
 };
 export const taskLimits: Record<
   ModelTask,
@@ -291,6 +292,7 @@ export async function generate<T>(
       outputTokens: 0,
       durationMs: 0,
     };
+    let rawOutput: string | undefined;
     try {
       if (cloud)
         await approve!(
@@ -353,6 +355,13 @@ export async function generate<T>(
         },
       );
       const body = await jsonResponse(response);
+      rawOutput = cloud
+        ? body.choices?.[0]?.message?.content
+        : body.message?.content;
+      event.inputTokens =
+        body.prompt_eval_count ?? body.usage?.prompt_tokens ?? 0;
+      event.outputTokens =
+        body.eval_count ?? body.usage?.completion_tokens ?? 0;
       if (!cloud && Number(body.prompt_eval_count ?? 0) + limits.output > 16384)
         throw new Error(
           "Model input left insufficient output context; select smaller evidence packets.",
@@ -382,6 +391,7 @@ export async function generate<T>(
       };
     } finally {
       event.durationMs = Date.now() - start;
+      options.onDiagnostic?.(rawOutput, event);
       await recorder?.(event);
     }
   });

@@ -2,8 +2,8 @@
 """Named, isolated VANI diagnostic jobs; invoked over SSH, never through HTTP."""
 import argparse, contextlib, datetime, fcntl, hashlib, json, os, pathlib, re, secrets, select, shutil, signal, socket, subprocess, sys, time, urllib.request, uuid
 
-JOBS=('doctor','snapshot','regression','model-smoke','browser','lab','soak')
-GPU_JOBS=('model-smoke','browser','lab','soak')
+JOBS=('doctor','snapshot','regression','model-smoke','browser','lab','soak','replay')
+GPU_JOBS=('model-smoke','browser','lab','soak','replay')
 ID=re.compile(r'^[0-9a-f]{32}$')
 _detached_children=[]
 class Cancelled(Exception): pass
@@ -239,8 +239,15 @@ class Job:
         if kind=='browser':
             self.step('Install sandbox Chromium',['node','node_modules/playwright/cli.js','install','chromium','--only-shell'],600)
             self.step('Verify browser dependencies before maintenance',['node','--input-type=module','-e',"import {chromium} from 'playwright';const b=await chromium.launch({headless:true});await b.close();"],60)
+        if kind=='replay':
+            replay_input=self.root/'replay-input.json'
+            if not replay_input.is_file() or replay_input.is_symlink() or replay_input.stat().st_size>5*1024**2:raise RuntimeError('Stage a private replay-input.json (max 5 MiB) in the debug root first.')
+            shutil.copyfile(replay_input,self.folder/'replay-input.json')
         with self.maintenance(),self.model():
             self.step('Actual local-model smoke test',['node','scripts/local-model-smoke.mjs'],900)
+            if kind=='replay':
+                for profile in ('original','concise'):
+                    self.step('Replay '+profile,['node','scripts/debug/replay.mjs','run',self.folder/'replay-input.json',self.folder/('replay-'+profile+'.json'),'--profile='+profile,'--limit=5'],3600)
             if kind in ('lab','soak','browser'):self.lab(kind=='soak',kind=='browser')
 
 def worker(root,install,job_id,lock_fd):
