@@ -33,7 +33,8 @@
     "lab:stop": "python3 scripts/refresh-lab.py stop",
     "lab:status": "python3 scripts/refresh-lab.py status",
     "test:lab": "node --test scripts/refresh-lab/report.test.mjs",
-    "lab:compare": "node scripts/refresh-lab/compare.mjs"
+    "lab:compare": "node scripts/refresh-lab/compare.mjs",
+    "test:debug": "python3 -m unittest discover -s scripts/debug -p 'test_*.py'"
   },
   "engines": {
     "node": ">=22.22.0"

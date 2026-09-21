@@ -173,3 +173,5 @@ Managed Ubuntu installations support [updates from Settings](docs/26-ui-updates.
 Open the managed UI from your LAN at `http://<desktop-IP>:3000`. See [LAN access and local-only configuration](docs/27-lan-access.md).
 
 For repeatable remote collection diagnosis, see the [quasar debugging plan](design/quasar-debugging.md) and run `node scripts/diagnostics/remote.mjs http://HOST:3000 .vani-diagnostics/RUN_NAME`. Raw reports are private and Git-ignored.
+
+Use the [SSH debug controller](docs/28-quasar-debugging.md) for isolated quasar regression, model, browser and soak jobs: `python3 -I scripts/debug.py --help`.
