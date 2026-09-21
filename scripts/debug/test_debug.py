@@ -152,6 +152,13 @@ class IntegrityTests(unittest.TestCase):
 
 
 class RemoteTransportTests(unittest.TestCase):
+ def test_transport_failure_reports_stderr_without_dumping_remote_script(self):
+  spec=importlib.util.spec_from_file_location('debug_controller',pathlib.Path(__file__).parents[1]/'debug.py')
+  controller=importlib.util.module_from_spec(spec);spec.loader.exec_module(controller)
+  error=subprocess.CalledProcessError(255,['ssh','private-long-script'],stderr=b'Connection failed')
+  with patch.object(controller.subprocess,'run',side_effect=error):
+   with self.assertRaisesRegex(RuntimeError,'Connection failed') as caught:controller.remote_command(['ssh'],'host',['python3','-c','private-long-script'],capture_output=True)
+  self.assertNotIn('private-long-script',str(caught.exception))
  def test_shell_startup_noise_preserves_json_and_binary(self):
   spec=importlib.util.spec_from_file_location('debug_controller',pathlib.Path(__file__).parents[1]/'debug.py')
   controller=importlib.util.module_from_spec(spec);spec.loader.exec_module(controller)

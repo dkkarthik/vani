@@ -1,5 +1,5 @@
 /* global fetch, AbortSignal */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import console from "node:console";
@@ -95,6 +95,15 @@ function validate(row, raw) {
     };
   }
 }
+// Reserve output before inference so an existing report never causes wasted calls.
+const target = resolve(output);
+await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+await writeFile(target, JSON.stringify({ status: "running", action }), {
+  mode: 0o600,
+  flag: "wx",
+});
+if (!["export", "packet"].includes(action))
+  await writeFile(target + ".jsonl", "", { mode: 0o600, flag: "wx" });
 let report;
 if (action === "export" || action === "packet") {
   if (!/^[0-9a-f-]{36}$/i.test(input)) throw Error("Expected an attempt UUID.");
@@ -194,12 +203,15 @@ if (action === "export" || action === "packet") {
       }
     }
     report.rows.push(record);
+    await appendFile(target + ".jsonl", JSON.stringify(record) + "\n", {
+      mode: 0o600,
+    });
+    console.log(
+      `Completed packet ${report.rows.length}/${rows.length}: ${record.replay?.issues?.length ?? record.baseline.issues.length} issue(s).`,
+    );
   }
 }
-const target = resolve(output);
-await mkdir(dirname(target), { recursive: true, mode: 0o700 });
 await writeFile(target, JSON.stringify(report, null, 2), {
   mode: 0o600,
-  flag: "wx",
 });
 console.log(`Saved private report: ${target}`);

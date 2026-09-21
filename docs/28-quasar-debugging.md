@@ -28,7 +28,8 @@ laptop. No sudo is used.
   writing inside production.
 
 Use `--identity /path/to/key`, `--ssh-port PORT`, or `--host YOUR_SSH_ALIAS` when
-needed. Only the key path is supplied; key contents are never copied to quasar.
+needed. `--address-family 4` forces IPv4 when VPN address selection is unreliable.
+SSH failures report connection stderr without dumping the remote script. Only the key path is supplied; key contents are never copied to quasar.
 
 ## Deploy the committed tools
 

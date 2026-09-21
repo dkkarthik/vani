@@ -161,6 +161,11 @@ it.skipIf(!enabled)(
     ]);
     await runCoreWorker();
     expect(chats).toBe(1);
+    await runCoreWorker();
+    expect(
+      (await pool.query("SELECT status FROM core_run WHERE id=$1", [again.id]))
+        .rows[0].status,
+    ).toBe("completed_with_errors");
     vi.unstubAllGlobals();
   },
 );

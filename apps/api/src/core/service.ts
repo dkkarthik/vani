@@ -1024,7 +1024,7 @@ async function readingStep(run: any) {
       const failed = Number(
         (
           await pool.query(
-            "SELECT count(*) n FROM core_candidate WHERE run_id=$1 AND state='failed'",
+            "SELECT count(*) n FROM core_candidate WHERE run_id=$1 AND state IN ('failed','blocked')",
             [run.id],
           )
         ).rows[0].n,

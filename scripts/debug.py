@@ -10,8 +10,12 @@ def remote_command(ssh, host, argv, **kwargs):
     command='printf %s '+shlex.quote(marker.decode())+'; exec '+shlex.join([str(x) for x in argv])
     capture=kwargs.pop('capture_output',False);destination=kwargs.pop('stdout',None)
     as_text=kwargs.pop('text',False)
-    result=subprocess.run(ssh+[host,command],check=True,stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE if capture else None,**kwargs)
+    try:
+        result=subprocess.run(ssh+[host,command],check=True,stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE if capture else None,**kwargs)
+    except subprocess.CalledProcessError as error:
+        detail=error.stderr.decode(errors='replace')[-2000:] if error.stderr else 'See SSH stderr above.'
+        raise RuntimeError(f'SSH debug command failed ({error.returncode}): {detail}') from None
     if marker not in result.stdout:raise RuntimeError('Remote debug response framing missing.')
     result.stdout=result.stdout.split(marker,1)[1]
     if as_text:
@@ -26,7 +30,7 @@ def remote_command(ssh, host, argv, **kwargs):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('action',choices=['deploy','run','status','logs','cancel','recover','fetch','tunnel'])
-    p.add_argument('--host',default='kdantu@quasar.cse.buffalo.edu');p.add_argument('--ssh-port',type=int,default=22);p.add_argument('--identity')
+    p.add_argument('--address-family',choices=['auto','4','6'],default='auto');p.add_argument('--host',default='kdantu@quasar.cse.buffalo.edu');p.add_argument('--ssh-port',type=int,default=22);p.add_argument('--identity')
     p.add_argument('--root',default='/data/install/vani-debug');p.add_argument('--install',default='/data/install/vani');p.add_argument('--python',default='python3')
     p.add_argument('--job',choices=['doctor','snapshot','regression','model-smoke','browser','lab','soak','replay'],default='doctor');p.add_argument('--id');p.add_argument('--maintenance',action='store_true');p.add_argument('--duration',type=int,default=3600);p.add_argument('--revision',default='HEAD');p.add_argument('--output',default='.vani-diagnostics/quasar');p.add_argument('--local-port',type=int,default=3001)
     a=p.parse_args()
@@ -35,6 +39,7 @@ def main():
     for path in (a.root,a.install):
         if not pathlib.PurePosixPath(path).is_absolute() or any(c in path for c in '\n\r\0'):p.error('Use absolute remote paths.')
     ssh=['ssh','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=10','-p',str(a.ssh_port)]
+    if a.address_family!='auto':ssh+=['-'+a.address_family]
     if a.identity:ssh+=['-i',a.identity,'-o','IdentitiesOnly=yes']
     def remote(argv,**kwargs):
         argv=list(argv)

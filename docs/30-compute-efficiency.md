@@ -37,7 +37,9 @@ them; a protected hold still requires researcher action.
 ## Repeatable replay on quasar
 
 Use a clean built checkout (`npm run build`) and an SSH tunnel or run the export on
-quasar against its loopback API. Files are created privately and never overwritten.
+quasar against its loopback API. Files are created privately and never overwritten. Output names are reserved before
+inference; each completed packet is also written to a `.jsonl` sidecar so partial
+results survive interruption.
 
 ```bash
 # Export a recorded attempt, including its original raw output.
@@ -84,3 +86,39 @@ model profile or reading budget is changed by replay.
 
 Automatic relevance-based compute adaptation is deliberately not claimed: the
 replay and feedback evidence must establish a reliable policy first.
+
+## First quasar experiment — 2026-09-21
+
+Production controls deployed from `27724e6`; isolated regression run
+`fdd835412b614d74957c9595273aa9a9` passed 166 API tests, 18 web tests,
+14 extension tests, 38 installer tests, 19 debug tests and 10 report/replay/proxy
+tests, with builds/typechecks/lint. The initial upgrade invocation used Python
+isolated mode and stopped at a sibling import before migration. Re-running the
+installer normally with Python environment variables cleared completed its backup,
+migration and startup checks successfully.
+
+Paired real-model replay `ba3bc60561834f76915d140e485561c6` used three current
+local evidence packets: two historically failed candidates and one previously
+accepted candidate. This is a small diagnostic sample, not a relevance benchmark.
+
+| Profile | Evidence-valid outputs | Total inference elapsed | Output tokens |
+| --- | --- | --- | --- |
+| Original thinking profile | 0 / 3 | 166.649 s | 11,655 |
+| Concise non-thinking profile | 1 / 3 | 51.660 s | 3,274 |
+
+The concise profile used approximately 69% less elapsed time and 72% fewer output
+tokens. It has **not** been promoted to production: two outputs still failed and
+no researcher relevance assessment was performed. The original profile produced
+ten quote mismatches and one uncited relationship source; the concise profile
+produced two quote mismatches. Seven original quote mismatches and one concise
+mismatch matched after whitespace normalization, while the others did not.
+
+The next experiment should select quotes from explicit source spans and retain
+original offsets/text, then evaluate claim support and relevance. Do not simply
+relax validation or accept paraphrases as quotations. Re-run against successful,
+failed and held-out papers before promoting an evidence-selection change.
+
+Private packets and full outputs remain in the debug run directory and the
+Git-ignored laptop diagnostics directory. The production source checkout's local
+`package-lock.json` change was preserved; deployment used a clean sibling worktree.
+The locomotion reading run remains held for explicit review, while VANI stays up.
