@@ -234,7 +234,7 @@ class Job:
                 self.step('Lint',['npm','run','lint'],600,env)
                 self.step('Installer lifecycle tests',[sys.executable,'-m','unittest','discover','-s','scripts/setup','-p','test_*.py'],600,env)
                 self.step('Debug infrastructure tests',[sys.executable,'-m','unittest','discover','-s','scripts/debug','-p','test_*.py'],600,env)
-                self.step('Report and proxy tests',['node','--test','scripts/refresh-lab/report.test.mjs','scripts/diagnostics/remote.test.mjs','scripts/web-network.test.mjs'],600,env)
+                self.step('Report and proxy tests',['node','--test','scripts/refresh-lab/report.test.mjs','scripts/diagnostics/remote.test.mjs','scripts/web-network.test.mjs','scripts/debug/replay.test.mjs'],600,env)
             return
         if kind=='browser':
             self.step('Install sandbox Chromium',['node','node_modules/playwright/cli.js','install','chromium','--only-shell'],600)

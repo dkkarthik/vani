@@ -330,6 +330,14 @@ export function rankPapers(
     (a, b) => b.score - a.score || a.paper.id.localeCompare(b.paper.id),
   );
 }
+export const Screen = z.object({
+  contribution: z.string().max(1800),
+  likelyRelated: z.boolean(),
+  reason: z.string().max(1000),
+  quote: z.string().min(12).max(800),
+  uncertainties: z.array(z.string()).max(5),
+});
+
 export const Source = z.object({
   id: z.string(),
   workId: z.string(),

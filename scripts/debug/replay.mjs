@@ -6,6 +6,7 @@ import console from "node:console";
 import { URL } from "node:url";
 import {
   Assessment,
+  Screen,
   assessmentIssues,
 } from "../../apps/api/dist/core/algorithm.js";
 const { values, positionals } = parseArgs({
@@ -53,7 +54,8 @@ function validate(row, raw) {
   const p = row.packet;
   try {
     const value = JSON.parse(raw);
-    if (p.task === "d1")
+    if (p.task === "d1") {
+      Screen.parse(value);
       return {
         value,
         issues:
@@ -68,6 +70,7 @@ function validate(row, raw) {
                 },
               ],
       };
+    }
     const parsed = Assessment.parse(value);
     return {
       value: parsed,

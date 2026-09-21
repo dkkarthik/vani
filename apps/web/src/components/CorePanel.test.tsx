@@ -80,3 +80,65 @@ it("saves edited queries from the adjacent control and confirms success", async 
   ).not.toBeInTheDocument();
   client.clear();
 });
+it("shows evidence yield and requires an explicit next-wave action for a paused batch", async () => {
+  vi.mocked(request).mockResolvedValue({
+    focus: {
+      version: 1,
+      profile: {
+        question: "Robot learning",
+        mode: "review",
+        budgets: { d2: 200, d3: 50 },
+        publicQueries: [],
+        anchors: [],
+        facets: [],
+        exclusions: [],
+      },
+    },
+    runs: [
+      {
+        status: "paused",
+        phase: "screening",
+        counters: {},
+        error: "Five consecutive attempts failed.",
+      },
+    ],
+    counts: [],
+    candidates: [],
+    audits: [],
+    policies: [],
+    compute: {
+      scope: "All attempts",
+      stages: [
+        {
+          stage: "D2",
+          attempts: 10,
+          accepted: 2,
+          duration_ms: 600000,
+          output_tokens: 1000,
+        },
+      ],
+      issues: [{ code: "quote_mismatch", count: 8 }],
+    },
+  });
+  vi.mocked(api.works).mockResolvedValue({ items: [] });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <CorePanel id="collection" />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("20%")).toBeVisible();
+  expect(screen.getByText("quote_mismatch: 8")).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Start next measured wave" }),
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "/collections/collection/core/control",
+      { method: "POST", body: JSON.stringify({ action: "resume" }) },
+    ),
+  );
+  client.clear();
+});

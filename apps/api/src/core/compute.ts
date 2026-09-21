@@ -147,7 +147,7 @@ export async function computeSummary(collectionId: string) {
     await pool.query(
       `SELECT stage,count(*)::int attempts,count(*) FILTER(WHERE status='accepted')::int accepted,
   count(*) FILTER(WHERE status='rejected')::int rejected,count(*) FILTER(WHERE status='error')::int errors,
-  COALESCE(sum(duration_ms),0)::float duration_ms,COALESCE(sum((invocation->>'outputTokens')::int),0)::float output_tokens
+  COALESCE(sum(COALESCE((invocation->>'durationMs')::int,duration_ms)),0)::float duration_ms,COALESCE(sum((invocation->>'outputTokens')::int),0)::float output_tokens
   FROM core_read_attempt WHERE collection_id=$1 GROUP BY stage ORDER BY stage`,
       [collectionId],
     )

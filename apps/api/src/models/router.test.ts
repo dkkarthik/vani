@@ -142,3 +142,31 @@ it("sends the task schema to local structured generation and still validates the
   );
   await expect(generate("Return text", {}, schema)).rejects.toThrow();
 });
+it("retains raw output and consumed tokens when schema validation fails", async () => {
+  const diagnostic = vi.fn();
+  vi.mocked(fetch).mockImplementation(async (url) =>
+    String(url).endsWith("/api/tags")
+      ? Response.json({
+          models: [{ name: config.ollamaModel, digest: "test" }],
+        })
+      : Response.json({
+          done: true,
+          prompt_eval_count: 40,
+          eval_count: 25,
+          message: { content: '{"wrong":"field"}' },
+        }),
+  );
+  await expect(
+    generate("x", {}, z.object({ required: z.string() }), {
+      onDiagnostic: diagnostic,
+    }),
+  ).rejects.toThrow();
+  expect(diagnostic).toHaveBeenCalledWith(
+    '{"wrong":"field"}',
+    expect.objectContaining({
+      status: "failed",
+      inputTokens: 40,
+      outputTokens: 25,
+    }),
+  );
+});

@@ -32,6 +32,7 @@ import {
   Focus,
   hash,
   Assessment,
+  Screen,
   assessmentIssues,
   type ValidationIssue,
   lexical,
@@ -812,13 +813,6 @@ async function sourcesFor(workId: string, question: string, deep = false) {
     });
   return sources;
 }
-const Screen = z.object({
-  contribution: z.string().max(1800),
-  likelyRelated: z.boolean(),
-  reason: z.string().max(1000),
-  quote: z.string().min(12).max(800),
-  uncertainties: z.array(z.string()).max(5),
-});
 async function saveAssessment(
   run: any,
   c: any,
