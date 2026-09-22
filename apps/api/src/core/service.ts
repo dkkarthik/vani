@@ -260,7 +260,7 @@ export async function stageCandidate(run: any, paper: any, path: any) {
       )
     ).rows[0];
     await db.query(
-      "UPDATE core_run_candidate SET retrieved=true,paths=(SELECT jsonb_agg(DISTINCT x) FROM jsonb_array_elements(paths||$3::jsonb) x) WHERE run_id=$1 AND candidate_id=$2",
+      "UPDATE core_run_candidate SET retrieved=true,paths=(SELECT jsonb_agg(DISTINCT x) FROM jsonb_array_elements(paths||$3::jsonb) x) WHERE run_id=$1 AND candidate_id=$2 AND EXISTS(SELECT 1 FROM core_run WHERE id=$1 AND status IN ('queued','running','paused','awaiting_evidence'))",
       [run.id, candidate.id, JSON.stringify([path])],
     );
     for (const [kind, url, predicate] of [
@@ -1140,7 +1140,7 @@ async function readingStep(run: any) {
   try {
     if (c.feedback?.label === "out_of_scope") {
       await pool.query(
-        "UPDATE core_candidate SET state='reviewed',proximity='out_of_scope' WHERE id=$1",
+        "UPDATE core_candidate SET state='reviewed',proximity='out_of_scope',assessment=assessment||'{\"humanDecision\":true}'::jsonb WHERE id=$1",
         [c.id],
       );
       return;

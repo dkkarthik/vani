@@ -440,7 +440,7 @@ export async function registerCore(app: FastifyInstance) {
         });
       const row = (
         await db.query(
-          "UPDATE core_candidate SET feedback=$2,updated_at=now() WHERE id=$1 RETURNING id",
+          "UPDATE core_candidate SET feedback=$2,state=CASE WHEN assessment->>'humanDecision'='true' AND $2::jsonb->>'label' IS DISTINCT FROM 'out_of_scope' THEN 'stale' ELSE state END,stage=CASE WHEN assessment->>'humanDecision'='true' AND $2::jsonb->>'label' IS DISTINCT FROM 'out_of_scope' THEN 'D0' ELSE stage END,proximity=CASE WHEN assessment->>'humanDecision'='true' AND $2::jsonb->>'label' IS DISTINCT FROM 'out_of_scope' THEN 'unassessed' ELSE proximity END,assessment=CASE WHEN assessment->>'humanDecision'='true' AND $2::jsonb->>'label' IS DISTINCT FROM 'out_of_scope' THEN '{}'::jsonb ELSE assessment END,updated_at=now() WHERE id=$1 RETURNING id",
           [id, JSON.stringify(d.label === "clear" ? {} : judgment)],
         )
       ).rows[0];

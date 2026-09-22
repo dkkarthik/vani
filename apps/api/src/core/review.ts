@@ -9,6 +9,16 @@ export function feedbackAdjustment(
   paper: { id: string; title: string; abstract?: string },
   examples: any[],
 ) {
+  const direct = examples.find(
+    (e) =>
+      e.id === paper.id &&
+      ["closest", "related", "out_of_scope"].includes(e.feedback?.label),
+  );
+  if (direct)
+    return {
+      adjustment: direct.feedback.label === "out_of_scope" ? -0.2 : 0.2,
+      influences: [direct.id],
+    };
   let adjustment = 0;
   const influences: string[] = [];
   for (const e of examples) {
@@ -36,13 +46,13 @@ export async function feedbackContext(collection: string) {
     )
   ).rows.map((x) => ({
     id: x.id,
-    title: x.title,
+    title: String(x.title ?? "").slice(0, 400),
     label: x.feedback.label,
     reason: (x.feedback.reason ?? "").slice(0, 500),
   }));
 }
 // SQL is constant; all user filters are bound parameters.
-const outcome = `CASE WHEN snapshot->>'state'='accepted' THEN 'accepted' WHEN snapshot->>'state' IN ('failed','blocked') THEN 'failure' WHEN snapshot->>'state'='excluded' THEN 'excluded' WHEN snapshot->>'proximity'='out_of_scope' OR snapshot->'assessment'->>'likelyRelated'='false' THEN 'not_related' WHEN snapshot->>'state'='deferred' THEN 'budget_deferred' WHEN snapshot->>'state'='needs_evidence' THEN 'missing_evidence' ELSE 'review' END`;
+const outcome = `CASE WHEN snapshot->>'state'='accepted' THEN 'accepted' WHEN snapshot->>'state' IN ('failed','blocked') THEN 'failure' WHEN snapshot->>'state'='excluded' THEN 'excluded' WHEN snapshot->>'state' IN ('reviewed','needs_evidence') AND (snapshot->>'proximity'='out_of_scope' OR snapshot->'assessment'->>'likelyRelated'='false') THEN 'not_related' WHEN snapshot->>'state'='deferred' THEN 'budget_deferred' WHEN snapshot->>'state'='needs_evidence' THEN 'missing_evidence' ELSE 'review' END`;
 const Id = z.string().uuid();
 export async function registerReview(app: FastifyInstance) {
   app.get("/api/v1/collections/:id/core/runs", async (r) => {
@@ -176,7 +186,7 @@ export async function registerReview(app: FastifyInstance) {
         queries: z.array(z.string().trim().min(2).max(300)).min(1).max(30),
         explanation: z.string().max(2000),
       }),
-      { task: "synthesis", collectionId: id },
+      { task: "synthesis", collectionId: id, privateEvidence: true },
     );
     return {
       ...result.value,

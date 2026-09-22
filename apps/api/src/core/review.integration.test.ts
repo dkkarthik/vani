@@ -122,11 +122,23 @@ it.skipIf(!enabled)(
         })
       ).statusCode,
     ).toBe(404);
+    await pool.query(
+      "UPDATE core_candidate SET state='reviewed',proximity='out_of_scope',assessment='{\"humanDecision\":true}' WHERE id=$1",
+      [c.id],
+    );
     await app.inject({
       method: "POST",
       url: `/api/v1/core/candidates/${c.id}/feedback`,
       payload: { label: "clear", runId: first.id },
     });
+    expect(
+      (
+        await pool.query(
+          "SELECT state,stage,proximity FROM core_candidate WHERE id=$1",
+          [c.id],
+        )
+      ).rows[0],
+    ).toMatchObject({ state: "stale", stage: "D0", proximity: "unassessed" });
     expect(
       (
         await pool.query("SELECT feedback FROM core_candidate WHERE id=$1", [

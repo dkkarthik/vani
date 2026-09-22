@@ -162,7 +162,7 @@ function PaperTrace({ collection, run, row, changed }: any) {
     </article>
   );
 }
-export function RefreshReview({ id }: { id: string }) {
+function RefreshReviewContent({ id }: { id: string }) {
   const client = useQueryClient();
   const [selected, setSelected] = useState(""),
     [runOffset, setRunOffset] = useState(0),
@@ -238,8 +238,7 @@ export function RefreshReview({ id }: { id: string }) {
     },
   });
   return (
-    <details>
-      <summary>Deep refresh history and feedback</summary>
+    <div>
       <p>
         Inspect every refresh, including rejected and deferred papers. Feedback
         affects subsequent local ranking and screening; it does not restart a
@@ -293,10 +292,11 @@ export function RefreshReview({ id }: { id: string }) {
           <p>
             {data.data.summary
               .map((x: any) => `${x.outcome.replaceAll("_", " ")}: ${x.count}`)
-              .join(" · ") || "No candidates recorded yet."}
+              .join(" · ") ||
+              "No candidate trace is available yet; older runs may predate tracing."}
           </p>
           <p>
-            Stages visited:{" "}
+            Stages reached or retained:{" "}
             {data.data.stages
               .map((x: any) => `${x.stage}: ${x.count}`)
               .join(" · ")}
@@ -321,7 +321,7 @@ export function RefreshReview({ id }: { id: string }) {
             </pre>
           </details>
           <label>
-            Visited stage
+            Recorded stage
             <select
               value={stage}
               onChange={(e) => {
@@ -441,6 +441,16 @@ export function RefreshReview({ id }: { id: string }) {
           Queries saved. Use Deep refresh to search with them.
         </p>
       )}
+    </div>
+  );
+}
+
+export function RefreshReview({ id }: { id: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Deep refresh history and feedback</summary>
+      {open && <RefreshReviewContent id={id} />}
     </details>
   );
 }
