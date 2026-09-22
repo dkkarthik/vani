@@ -38,4 +38,8 @@ The timeline covers staged candidates; it does not claim to enumerate papers tha
 
 Fresh local PostgreSQL 18: all 169 API tests passed, including real database history immutability, discovery path isolation, feedback provenance and clearing, and existing D0–D3 pipeline tests. Local web tests include quick feedback, optional explanations, and versioned query application. A separate routing test verifies that query proposals pass private evidence to local inference without cloud approval.
 
-The first committed revision was submitted to quasar's isolated regression job `5e9a849d96154849b6f96566299160d2`. SSH subsequently became unreachable, so that remote result and production rollout are not yet verified. No production refresh was resumed for these tests.
+Quasar's final isolated regression `b1438a9f607e4f3287d3521bc85dbd14` passed on code revision `0cf60aa`: 169 API tests, 19 web tests, 14 extension tests, 38 installer tests, 20 debugging tests, and 10 report/replay/proxy tests, plus builds, typechecks, and lint. Reports are retained in the private diagnostics folder.
+
+Production was updated through the rootless installer from clean worktree `/data/projects/vani-deploy-0cf60aa` to `/data/install/vani`. Build identity confirms `0cf60aabfcd39fdc6e99f1019a2d6e0253ab68cc`. The user's modified `package-lock.json` in `/data/projects/vani` was preserved. Through port 3000, refresh summaries and candidate detail endpoints returned successfully for both collections: 4,286 locomotion candidates and 6,790 GoLF candidates were backfilled as partial history. The locomotion run remains protected and paused; no production refresh was resumed for verification.
+
+Read-only Chrome verification through the VPN also passed on production: the review opened, filtering to `not_related` returned 250 locomotion papers, paper drill-down displayed sources, and the page reported no JavaScript errors. No production feedback was submitted during this check.
