@@ -1,3 +1,4 @@
+import { runSimpleWorker, scheduleSimple } from "./simple-discovery/service.js";
 import { enqueueCore, runCoreWorker, resumeEvidence } from "./core/service.js";
 import { scheduleAudits, runAuditWorker } from "./core/audits.js";
 import { defaultKeywords, keywordMatch } from "./collection-focus.js";
@@ -229,7 +230,7 @@ export async function runDueCollections(repository: Repository) {
     if (!locked) return;
     const due = (
       await db.query(
-        "SELECT id,discovery FROM collection WHERE deleted_at IS NULL AND discovery->>'enabled'='true' AND next_discovery_at<=now()",
+        "SELECT id,discovery FROM collection WHERE deleted_at IS NULL AND discovery->>'enabled'='true' AND next_discovery_at<=now() AND NOT EXISTS(SELECT 1 FROM simple_discovery_settings s WHERE s.collection_id=collection.id AND s.profile->>'enabled'='true')",
       )
     ).rows;
     for (const row of due) {
@@ -280,17 +281,26 @@ export function startDiscoveryWorker(
     void tick();
     return timer;
   };
+  const simpleOnly = process.env.VANI_SIMPLE_DISCOVERY_ONLY === "true";
   const timers = [
+    lane(runSimpleWorker, 2000),
+    lane(scheduleSimple, 60000),
     lane(async () => {
+      if (simpleOnly) return;
       await runCoreWorker();
       await resumeEvidence();
     }, 2000),
-    lane(runEnrichment, 3000),
     lane(async () => {
+      if (!simpleOnly) await runEnrichment();
+    }, 3000),
+    lane(async () => {
+      if (simpleOnly) return;
       await runDueCollections(repository);
       await scheduleAudits();
     }, 60000),
-    lane(runAuditWorker, 10000),
+    lane(async () => {
+      if (!simpleOnly) await runAuditWorker();
+    }, 10000),
   ];
   return () => timers.forEach(clearInterval);
 }

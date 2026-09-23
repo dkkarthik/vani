@@ -4,7 +4,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'data/**', '.vani-refresh-lab/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'data/**', '.vani-refresh-lab/**', '.vani-diagnostics/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -1,3 +1,4 @@
+import { registerSimpleDiscovery } from "./simple-discovery/routes.js";
 import { registerUpdates } from "./updates.js";
 import { registerConversations } from "./core/conversations.js";
 import { registerCore } from "./core/routes.js";
@@ -85,6 +86,7 @@ export async function registerRoutes(
   await registerCollectionFocus(app);
   await registerDeepRefresh(app, repository);
   await registerCore(app);
+  await registerSimpleDiscovery(app);
   await registerKnowledge(app, repository);
   await registerDocuments(app);
   await registerEvidence(app);

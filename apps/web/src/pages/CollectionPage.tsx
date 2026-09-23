@@ -1,3 +1,4 @@
+import { RecommendationInbox } from "../components/RecommendationInbox";
 import { CorePanel } from "../components/CorePanel";
 import { DeepRefresh } from "../components/DeepRefresh";
 import { CollectionKeywords } from "../components/CollectionKeywords";
@@ -29,6 +30,11 @@ export function CollectionPage() {
   const [name, setName] = useState("");
   const [report, setReport] = useState<CollectionWork>();
   const [onlyNew, setOnlyNew] = useState(false);
+  const [simpleMode, setSimpleMode] = useState<{
+    id: string;
+    enabled: boolean;
+  }>();
+  const simpleEnabled = simpleMode?.id === collectionId && simpleMode?.enabled;
   // Preserve NEW badges for this visit after acknowledging their successful display.
   const visit = useRef<{
     id?: string;
@@ -155,7 +161,9 @@ export function CollectionPage() {
         title={active?.name ?? "Collections"}
         description={
           active?.description ||
-          "A living collection of related papers and evidence-backed first passes."
+          (simpleEnabled
+            ? "Review ranked recommendations and save the papers that fit your research."
+            : "A living collection of related papers and evidence-backed first passes.")
         }
         actions={
           <>
@@ -181,7 +189,7 @@ export function CollectionPage() {
           </>
         }
       />
-      {collectionId && (
+      {collectionId && !simpleEnabled && (
         <section className="discovery-summary">
           <div>
             <strong>
@@ -222,8 +230,19 @@ export function CollectionPage() {
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
         <>
-          <DeepRefresh key={"refresh:" + collectionId} id={collectionId} />
-          <CorePanel key={collectionId} id={collectionId} />
+          <RecommendationInbox
+            key={"simple:" + collectionId}
+            id={collectionId}
+            onMode={setSimpleMode}
+          />
+          <details
+            open={!simpleEnabled}
+            key={"reasoning:" + collectionId + simpleEnabled}
+          >
+            <summary>Deep reading and research focus</summary>
+            <DeepRefresh key={"refresh:" + collectionId} id={collectionId} />
+            <CorePanel key={collectionId} id={collectionId} />
+          </details>
         </>
       )}
       {collectionId && active?.collectionType !== "saved_search" && (
