@@ -250,3 +250,58 @@ it("defaults to a ready shortlist, explains filtered papers, and saves local foc
   });
   client.clear();
 });
+
+it("sorts by metadata and returns to page one without starting a refresh", async () => {
+  vi.mocked(request).mockResolvedValue({
+    settings: {
+      version: 1,
+      profile: {
+        enabled: true,
+        sources: [],
+        publicQueries: [],
+        arxivCategories: [],
+      },
+    },
+    items: [],
+    total: 60,
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <RecommendationInbox id="collection" />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Next recommendations" }),
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "/collections/collection/recommendations?view=recommended&offset=25&sort=view",
+    ),
+  );
+  fireEvent.change(
+    await screen.findByRole("combobox", { name: "Recommendation sort" }),
+    { target: { value: "metadata_desc" } },
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "/collections/collection/recommendations?view=recommended&offset=0&sort=metadata_desc",
+    ),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Previous recommendations" }),
+  ).toBeDisabled();
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Recommendation sort" }),
+    { target: { value: "metadata_asc" } },
+  );
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "/collections/collection/recommendations?view=recommended&offset=0&sort=metadata_asc",
+    ),
+  );
+  expect(vi.mocked(request).mock.calls.every(([, init]) => !init)).toBe(true);
+  client.clear();
+});

@@ -19,6 +19,7 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
     const q = z
       .object({
         offset: z.coerce.number().int().min(0).default(0),
+        sort: z.enum(["view", "metadata_desc", "metadata_asc"]).default("view"),
         view: z
           .enum(["recommended", "shortlist", "filtered", "saved", "dismissed"])
           .default("recommended"),
@@ -71,9 +72,14 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
             : (model?.run_id ?? null),
         ]
       : [id];
-    const order = ["shortlist", "filtered"].includes(q.view)
-      ? "(r.explanation#>>'{sanity,score}')::double precision DESC NULLS LAST,r.paper_id"
-      : "r.score DESC NULLS LAST,r.paper_id";
+    const order =
+      q.sort === "metadata_asc"
+        ? "r.score ASC NULLS LAST,r.paper_id"
+        : q.sort === "metadata_desc"
+          ? "r.score DESC NULLS LAST,r.paper_id"
+          : ["shortlist", "filtered"].includes(q.view)
+            ? "(r.explanation#>>'{sanity,score}')::double precision DESC NULLS LAST,r.paper_id"
+            : "r.score DESC NULLS LAST,r.paper_id";
     const total = (
       await pool.query(
         `SELECT count(*)::int n FROM simple_recommendation r WHERE r.collection_id=$1 AND ${predicate}`,

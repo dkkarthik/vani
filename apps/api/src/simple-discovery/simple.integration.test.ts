@@ -402,3 +402,97 @@ it.skipIf(!enabled)(
     await app.close();
   },
 );
+
+it.skipIf(!enabled)(
+  "sorts the whole shortlist by metadata before pagination, with stable ties and missing scores last",
+  async () => {
+    const { id, app } = await fixture();
+    await saveSettings(
+      id,
+      1,
+      Profile.parse({ enabled: true, shortlist: { enabled: true } }),
+    );
+    const run = uuid();
+    await pool.query(
+      "INSERT INTO simple_run(id,collection_id,settings_version,snapshot,status) VALUES($1,$2,2,'{}','complete')",
+      [run, id],
+    );
+    await pool.query(
+      "INSERT INTO simple_model(collection_id,run_id,metadata,model) VALUES($1,$2,$3,'{}')",
+      [
+        id,
+        run,
+        JSON.stringify({
+          settingsVersion: 2,
+          labelVersion: 0,
+          shortlist: { status: "ready" },
+        }),
+      ],
+    );
+    const rows: Array<{ paper_id: string; score: number | null }> = [];
+    for (let i = 0; i < 30; i++) {
+      const paper = uuid(),
+        score = i === 28 ? null : Math.floor(i / 2) - 7;
+      await pool.query("INSERT INTO simple_paper(id,paper) VALUES($1,$2)", [
+        paper,
+        JSON.stringify({ title: `Sort fixture ${i}` }),
+      ]);
+      await pool.query(
+        "INSERT INTO simple_recommendation(collection_id,paper_id,run_id,score,explanation) VALUES($1,$2,$3,$4,$5)",
+        [
+          id,
+          paper,
+          run,
+          score,
+          JSON.stringify({ sanity: { selected: i < 29, score: -i } }),
+        ],
+      );
+      if (i < 29) rows.push({ paper_id: paper, score });
+    }
+    const base = `/api/v1/collections/${id}/recommendations?view=shortlist`;
+    for (const sort of ["metadata_desc", "metadata_asc"]) {
+      const first = (await app.inject(base + `&sort=${sort}`)).json();
+      const second = (
+        await app.inject(base + `&sort=${sort}&offset=25`)
+      ).json();
+      const expected = [...rows].sort((a, b) =>
+        a.score == null
+          ? 1
+          : b.score == null
+            ? -1
+            : (sort === "metadata_asc"
+                ? a.score - b.score
+                : b.score - a.score) || a.paper_id.localeCompare(b.paper_id),
+      );
+      expect(first.total).toBe(29);
+      expect(first.items).toHaveLength(25);
+      expect(second.items).toHaveLength(4);
+      expect([...first.items, ...second.items].map((r) => r.paper_id)).toEqual(
+        expected.map((r) => r.paper_id),
+      );
+      expect(second.items.at(-1).score).toBeNull();
+    }
+    const original = (await app.inject(base)).json();
+    expect(original.items[0].paper_id).toBe(rows[0]!.paper_id);
+    expect(
+      (await app.inject(base + "&sort=invalid")).statusCode,
+    ).toBeGreaterThanOrEqual(400);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM simple_run WHERE collection_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM simple_feedback WHERE collection_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    await app.close();
+  },
+);

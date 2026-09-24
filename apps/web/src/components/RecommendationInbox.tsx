@@ -21,7 +21,7 @@ const sanityReasons: Record<string, string> = {
     "More usable paper metadata is needed to train the second pass.",
   not_converged: "The second-pass solver did not converge within its budget.",
 };
-function Paper({ row, id, changed, shortlistReady, view }: any) {
+function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
   const [note, setNote] = useState(row.reason ?? "");
   const action = useMutation({
     mutationFn: ({ verb, label }: { verb: string; label?: string }) =>
@@ -34,6 +34,7 @@ function Paper({ row, id, changed, shortlistReady, view }: any) {
     onSuccess: changed,
   });
   const useSanityScore =
+    sort === "view" &&
     shortlistReady &&
     row.explanation.sanity &&
     ["shortlist", "filtered"].includes(view);
@@ -72,12 +73,20 @@ function Paper({ row, id, changed, shortlistReady, view }: any) {
                   ? "Filtered — retained for inspection"
                   : "Recommended — metadata ranking"}
         </strong>{" "}
-        · {useSanityScore ? "Sanity score" : "Broad score"}{" "}
-        {Number(
-          useSanityScore ? row.explanation.sanity.score : (row.score ?? 0),
-        ).toFixed(3)}{" "}
+        · {useSanityScore ? "Sanity score" : "Metadata ranking"}{" "}
+        {(useSanityScore ? row.explanation.sanity.score : row.score) == null
+          ? "unavailable"
+          : Number(
+              useSanityScore ? row.explanation.sanity.score : row.score,
+            ).toFixed(3)}{" "}
         (not a probability)
       </p>
+      {useSanityScore && (
+        <p>
+          Metadata ranking:{" "}
+          {row.score == null ? "unavailable" : Number(row.score).toFixed(3)}
+        </p>
+      )}
       {shortlistReady && row.explanation.sanity && (
         <details>
           <summary>
@@ -220,15 +229,16 @@ export function RecommendationInbox({
 }) {
   const client = useQueryClient(),
     [view, setView] = useState("recommended"),
+    [sort, setSort] = useState("view"),
     [offset, setOffset] = useState(0),
     [draft, setDraft] = useState<any>(),
     [refineDraft, setRefineDraft] = useState<any>(),
     [saved, setSaved] = useState("");
   const data = useQuery({
-    queryKey: ["recommendations", id, view, offset],
+    queryKey: ["recommendations", id, view, sort, offset],
     queryFn: () =>
       request<any>(
-        `/collections/${id}/recommendations?view=${view}&offset=${offset}`,
+        `/collections/${id}/recommendations?view=${view}&offset=${offset}&sort=${sort}`,
       ),
     refetchInterval: 5000,
   });
@@ -760,6 +770,21 @@ export function RecommendationInbox({
           <option value="dismissed">Dismissed</option>
         </select>
       </label>
+      <label style={{ marginLeft: 16 }}>
+        Sort by{" "}
+        <select
+          aria-label="Recommendation sort"
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value);
+            setOffset(0);
+          }}
+        >
+          <option value="view">Current view ranking</option>
+          <option value="metadata_desc">Metadata ranking: highest first</option>
+          <option value="metadata_asc">Metadata ranking: lowest first</option>
+        </select>
+      </label>
       <p>{d.total} papers in this view</p>
       {!d.total && (
         <p>
@@ -778,6 +803,7 @@ export function RecommendationInbox({
           changed={changed}
           shortlistReady={d.shortlistReady}
           view={view}
+          sort={sort}
         />
       ))}
       <div style={{ display: "flex", gap: 8 }}>
