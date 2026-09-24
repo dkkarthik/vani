@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { request } from "../api";
 import { ErrorNotice } from "./ui";
 import { externalPaperUrl, paperReference } from "@vani/shared";
@@ -21,9 +26,18 @@ const sanityReasons: Record<string, string> = {
     "More usable paper metadata is needed to train the second pass.",
   not_converged: "The second-pass solver did not converge within its budget.",
 };
-function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
+function Paper({
+  row,
+  id,
+  changed,
+  beforeChange,
+  shortlistReady,
+  view,
+  sort,
+}: any) {
   const [note, setNote] = useState(row.reason ?? "");
   const action = useMutation({
+    mutationKey: ["recommendation-review", id],
     mutationFn: ({ verb, label }: { verb: string; label?: string }) =>
       request(`/collections/${id}/recommendations/${row.paper_id}/${verb}`, {
         method: "POST",
@@ -31,7 +45,8 @@ function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
           verb === "feedback" ? { label, reason: note } : {},
         ),
       }),
-    onSuccess: changed,
+    onMutate: () => beforeChange(row.paper_id),
+    onSuccess: (result, variables) => changed(row.paper_id, variables, result),
   });
   const useSanityScore =
     sort === "view" &&
@@ -43,6 +58,7 @@ function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
     href = externalPaperUrl(p.url) ?? externalPaperUrl(reference.recordUrl);
   return (
     <article
+      data-paper-id={row.paper_id}
       className="card"
       style={{
         padding: 16,
@@ -78,13 +94,13 @@ function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
           ? "unavailable"
           : Number(
               useSanityScore ? row.explanation.sanity.score : row.score,
-            ).toFixed(3)}{" "}
+            ).toFixed(useSanityScore ? 3 : 6)}{" "}
         (not a probability)
       </p>
       {useSanityScore && (
         <p>
           Metadata ranking:{" "}
-          {row.score == null ? "unavailable" : Number(row.score).toFixed(3)}
+          {row.score == null ? "unavailable" : Number(row.score).toFixed(6)}
         </p>
       )}
       {shortlistReady && row.explanation.sanity && (
@@ -163,31 +179,43 @@ function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
       >
         <button
           className="button primary"
-          disabled={action.isPending || !!row.work_id}
-          onClick={() => action.mutate({ verb: "save" })}
+          aria-disabled={action.isPending || !!row.work_id}
+          onClick={() =>
+            !action.isPending && !row.work_id && action.mutate({ verb: "save" })
+          }
         >
           {row.work_id ? "Saved" : "Save to collection"}
         </button>
         <button
           className="button secondary"
           aria-pressed={row.feedback === "up"}
-          disabled={action.isPending}
-          onClick={() => action.mutate({ verb: "feedback", label: "up" })}
+          aria-disabled={action.isPending}
+          onClick={() =>
+            !action.isPending &&
+            action.mutate({ verb: "feedback", label: "up" })
+          }
         >
           👍 Good match
         </button>
         <button
           className="button secondary"
           aria-pressed={row.feedback === "down"}
-          disabled={action.isPending}
-          onClick={() => action.mutate({ verb: "feedback", label: "down" })}
+          aria-disabled={action.isPending}
+          onClick={() =>
+            !action.isPending &&
+            action.mutate({ verb: "feedback", label: "down" })
+          }
         >
           👎 Poor match
         </button>
         <button
           className="button secondary"
-          disabled={action.isPending || !row.feedback}
-          onClick={() => action.mutate({ verb: "feedback", label: "clear" })}
+          aria-disabled={action.isPending || !row.feedback}
+          onClick={() =>
+            !action.isPending &&
+            !!row.feedback &&
+            action.mutate({ verb: "feedback", label: "clear" })
+          }
         >
           Clear feedback
         </button>
@@ -204,8 +232,10 @@ function Paper({ row, id, changed, shortlistReady, view, sort }: any) {
         </label>
         <button
           className="button secondary"
-          disabled={action.isPending || !row.feedback}
+          aria-disabled={action.isPending || !row.feedback}
           onClick={() =>
+            !action.isPending &&
+            !!row.feedback &&
             action.mutate({ verb: "feedback", label: row.feedback })
           }
         >
@@ -229,11 +259,50 @@ export function RecommendationInbox({
 }) {
   const client = useQueryClient(),
     [view, setView] = useState("recommended"),
-    [sort, setSort] = useState("view"),
+    [sort, setSort] = useState(() => {
+      try {
+        const saved = window.localStorage.getItem(
+          `vani:recommendation-sort:${id}`,
+        );
+        return ["view", "metadata_desc", "metadata_asc"].includes(saved ?? "")
+          ? saved!
+          : "view";
+      } catch {
+        return "view";
+      }
+    }),
     [offset, setOffset] = useState(0),
     [draft, setDraft] = useState<any>(),
     [refineDraft, setRefineDraft] = useState<any>(),
     [saved, setSaved] = useState("");
+  const section = useRef<HTMLElement>(null);
+  const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
+  const [held, setHeld] = useState<{
+    key: string;
+    data: any;
+    fetchedAt: number;
+  } | null>(null);
+  const pendingReviews = useIsMutating({
+    mutationKey: ["recommendation-review", id],
+  });
+  const pageKey = JSON.stringify([id, view, sort, offset]);
+  const review = held?.key === pageKey ? held.data : null;
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(`vani:recommendation-sort:${id}`, sort);
+    } catch {
+      /* Storage may be disabled. */
+    }
+  }, [id, sort]);
+  useLayoutEffect(() => {
+    const saved = anchor.current;
+    anchor.current = null;
+    if (saved?.element.isConnected) {
+      const delta = saved.element.getBoundingClientRect().top - saved.top;
+      if (Math.abs(delta) > 1)
+        window.scrollBy({ top: delta, behavior: "instant" });
+    }
+  });
   const data = useQuery({
     queryKey: ["recommendations", id, view, sort, offset],
     queryFn: () =>
@@ -242,7 +311,37 @@ export function RecommendationInbox({
       ),
     refetchInterval: 5000,
   });
-  const changed = () => {
+  const changed = (
+    paperId?: string,
+    variables?: { verb: string; label?: string },
+    result?: any,
+  ) => {
+    if (paperId && variables)
+      setHeld((current) =>
+        current?.key === pageKey
+          ? {
+              ...current,
+              data: {
+                ...current.data,
+                items: current.data.items.map((row: any) =>
+                  row.paper_id !== paperId
+                    ? row
+                    : {
+                        ...row,
+                        ...(variables.verb === "save"
+                          ? { work_id: result.workId, feedback: "up" }
+                          : {
+                              feedback:
+                                variables.label === "clear"
+                                  ? null
+                                  : variables.label,
+                            }),
+                      },
+                ),
+              },
+            }
+          : current,
+      );
     void client.invalidateQueries({ queryKey: ["recommendations", id] });
     void client.invalidateQueries({ queryKey: ["collection-members", id] });
     void client.invalidateQueries({ queryKey: ["collections"] });
@@ -266,7 +365,17 @@ export function RecommendationInbox({
       changed();
     },
   });
-  const d = data.data;
+  const d = data.data ?? review;
+  const visible = review ?? d;
+  const beforeChange = (paperId: string) => {
+    const card = [
+      ...(section.current?.querySelectorAll<HTMLElement>("[data-paper-id]") ??
+        []),
+    ].find((el) => el.dataset.paperId === paperId);
+    if (card)
+      anchor.current = { element: card, top: card.getBoundingClientRect().top };
+    setHeld({ key: pageKey, data: visible, fetchedAt: data.dataUpdatedAt });
+  };
   const enabled = d?.settings?.profile.enabled;
   useEffect(() => {
     if (typeof enabled === "boolean") onMode?.({ id, enabled });
@@ -283,11 +392,19 @@ export function RecommendationInbox({
       setOffset(0);
     }
   }, [shortlistEnabled]);
-  if (data.error) return <ErrorNotice error={data.error} />;
-  if (!d?.settings) return null;
-  const cfg = d.settings,
+  if (data.error && !visible) return <ErrorNotice error={data.error} />;
+  if (!visible?.settings) return null;
+  const cfg = (d ?? visible).settings,
     sourceRun = d.sourceRun ?? (d.run?.tasks.length ? d.run : null),
-    active = ["queued", "running"].includes(d.run?.status);
+    active = ["queued", "running"].includes(d?.run?.status);
+  const ready =
+    pendingReviews === 0 &&
+    (!held || data.dataUpdatedAt > held.fetchedAt) &&
+    !data.isFetching &&
+    !data.error &&
+    !active &&
+    !!d &&
+    (!["shortlist", "filtered"].includes(view) || d.shortlistReady);
   const launch = (mode: string) => {
     setSaved("");
     action.mutate(
@@ -304,6 +421,7 @@ export function RecommendationInbox({
   };
   return (
     <section
+      ref={section}
       className="card"
       style={{
         padding: 20,
@@ -481,7 +599,7 @@ export function RecommendationInbox({
           </label>
           <button
             className="button primary"
-            disabled={action.isPending || active}
+            aria-disabled={action.isPending || active}
             onClick={() =>
               action.mutate(
                 {
@@ -646,7 +764,7 @@ export function RecommendationInbox({
           </label>
           <button
             className="button primary"
-            disabled={action.isPending}
+            aria-disabled={action.isPending}
             onClick={() =>
               action.mutate(
                 {
@@ -755,6 +873,7 @@ export function RecommendationInbox({
           aria-label="Recommendation view"
           value={view}
           onChange={(e) => {
+            setHeld(null);
             setView(e.target.value);
             setOffset(0);
           }}
@@ -776,6 +895,7 @@ export function RecommendationInbox({
           aria-label="Recommendation sort"
           value={sort}
           onChange={(e) => {
+            setHeld(null);
             setSort(e.target.value);
             setOffset(0);
           }}
@@ -785,8 +905,39 @@ export function RecommendationInbox({
           <option value="metadata_asc">Metadata ranking: lowest first</option>
         </select>
       </label>
-      <p>{d.total} papers in this view</p>
-      {!d.total && (
+      {sort !== "view" && (
+        <p>
+          Signed metadata scores,{" "}
+          {sort === "metadata_desc"
+            ? "highest first (−0.39 ranks above −0.45)"
+            : "lowest first (−0.45 ranks below −0.39)"}
+          . Equal scores use a stable paper order.
+        </p>
+      )}
+      {review && (
+        <div role="status">
+          <p>
+            Your review order is held in place.{" "}
+            {ready
+              ? "Updated ranking is ready."
+              : "Feedback is saved when its action succeeds; reranking continues in the background."}
+          </p>
+          <button
+            className="button secondary"
+            disabled={!ready}
+            onClick={() => {
+              setHeld(null);
+              setOffset(0);
+              section.current?.scrollIntoView({ block: "start" });
+            }}
+          >
+            Show updated ranking
+          </button>
+        </div>
+      )}
+      {data.error && <ErrorNotice error={data.error} />}
+      <p>{visible.total} papers in this view</p>
+      {!visible.total && (
         <p>
           {active
             ? "Discovery is running; results will appear here as batches arrive."
@@ -795,13 +946,14 @@ export function RecommendationInbox({
               : "No papers in this view. Refresh sources or import and rerank earlier public candidates."}
         </p>
       )}
-      {(d.items ?? []).map((row: any) => (
+      {(visible.items ?? []).map((row: any) => (
         <Paper
           key={row.paper_id}
           row={row}
           id={id}
           changed={changed}
-          shortlistReady={d.shortlistReady}
+          beforeChange={beforeChange}
+          shortlistReady={visible.shortlistReady}
           view={view}
           sort={sort}
         />
@@ -810,14 +962,20 @@ export function RecommendationInbox({
         <button
           className="button secondary"
           disabled={!offset}
-          onClick={() => setOffset(Math.max(0, offset - 25))}
+          onClick={() => {
+            setHeld(null);
+            setOffset(Math.max(0, offset - 25));
+          }}
         >
           Previous recommendations
         </button>
         <button
           className="button secondary"
-          disabled={offset + 25 >= d.total}
-          onClick={() => setOffset(offset + 25)}
+          disabled={offset + 25 >= visible.total}
+          onClick={() => {
+            setHeld(null);
+            setOffset(offset + 25);
+          }}
         >
           Next recommendations
         </button>

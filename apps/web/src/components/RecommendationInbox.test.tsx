@@ -1,4 +1,4 @@
-import { afterEach, it, expect, vi } from "vitest";
+import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -10,9 +10,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RecommendationInbox } from "./RecommendationInbox";
 import { request } from "../api";
 vi.mock("../api", () => ({ request: vi.fn() }));
+beforeEach(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    clear: () => values.clear(),
+  });
+});
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 it("shows metadata immediately and exposes refresh, feedback, save and public settings", async () => {
   const profile = {
@@ -303,5 +313,198 @@ it("sorts by metadata and returns to page one without starting a refresh", async
     ),
   );
   expect(vi.mocked(request).mock.calls.every(([, init]) => !init)).toBe(true);
+  client.clear();
+});
+
+it("keeps cards, notes and scores in place through feedback reranking and save until explicitly applied", async () => {
+  const row = (id: string, score: number) => ({
+    paper_id: id,
+    score,
+    paper: { title: id, authors: [] },
+    explanation: {
+      sanity: {
+        selected: true,
+        score,
+        matchedFocus: [],
+        matchedContext: [],
+        terms: [],
+      },
+    },
+    sources: [],
+  });
+  const initial = {
+    settings: {
+      version: 1,
+      profile: { enabled: true, shortlist: { enabled: true } },
+    },
+    shortlistReady: true,
+    model: {
+      updated_at: "2026-09-24",
+      metadata: { shortlist: { candidates: 2, selected: 2, positive: 1 } },
+    },
+    total: 2,
+    items: [row("Paper A", -0.39), row("Paper B", -0.45)],
+  };
+  let response: any = initial;
+  vi.mocked(request).mockImplementation(async (_path, init) => {
+    if (init) {
+      response = {
+        ...initial,
+        shortlistReady: false,
+        run: { status: "queued", tasks: [] },
+        total: 0,
+        items: [],
+      };
+      return _path.endsWith("/save") ? { workId: "saved-b" } : {};
+    }
+    return response;
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <RecommendationInbox id="stable" />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Paper B", { exact: true });
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", { name: "Recommendation view" }),
+    ).toHaveValue("shortlist"),
+  );
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Recommendation sort" }),
+    { target: { value: "metadata_desc" } },
+  );
+  await screen.findByText("Paper B", { exact: true });
+  const cards = () => [...document.querySelectorAll("article")];
+  const first = cards()[0]!;
+  const note = first.querySelector("textarea")!;
+  fireEvent.change(note, {
+    target: { value: "Important spatial discretization method" },
+  });
+  const goodMatch = screen.getAllByRole("button", {
+    name: "👍 Good match",
+  })[0]!;
+  goodMatch.focus();
+  fireEvent.click(goodMatch);
+  await waitFor(() =>
+    expect(
+      screen.getAllByRole("button", { name: "👍 Good match" })[0],
+    ).toHaveAttribute("aria-pressed", "true"),
+  );
+  await waitFor(() =>
+    expect(screen.getByText(/Local reranking: queued/)).toBeVisible(),
+  );
+  expect(goodMatch).toHaveFocus();
+  expect(cards()[0]).toBe(first);
+  expect(note.value).toBe("Important spatial discretization method");
+  expect(
+    screen.getByRole("button", { name: "Show updated ranking" }),
+  ).toBeDisabled();
+  response = { ...initial, items: [row("Paper B", 0.8), row("Paper A", 0.2)] };
+  await client.invalidateQueries({ queryKey: ["recommendations", "stable"] });
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Show updated ranking" }),
+    ).toBeEnabled(),
+  );
+  expect(cards()[0]).toBe(first);
+  expect(first).toHaveTextContent("Metadata ranking -0.390000");
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "Save to collection" })[1]!,
+  );
+  await screen.findByRole("button", { name: "Saved" });
+  expect(cards()).toHaveLength(2);
+  response = { ...initial, total: 1, items: [row("Paper A", 0.2)] };
+  await client.invalidateQueries({ queryKey: ["recommendations", "stable"] });
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Show updated ranking" }),
+    ).toBeEnabled(),
+  );
+  const originalScroll = Element.prototype.scrollIntoView;
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  fireEvent.click(screen.getByRole("button", { name: "Show updated ranking" }));
+  await waitFor(() => expect(cards()).toHaveLength(1));
+  expect(first).toHaveTextContent("Metadata ranking 0.200000");
+  expect(scroll).toHaveBeenCalled();
+  Element.prototype.scrollIntoView = originalScroll;
+  client.clear();
+});
+
+it("remembers numeric metadata sort per collection after remount", async () => {
+  vi.mocked(request).mockResolvedValue({
+    settings: { version: 1, profile: { enabled: true } },
+    items: [],
+    total: 0,
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const renderInbox = () =>
+    render(
+      <QueryClientProvider client={client}>
+        <RecommendationInbox id="persist" />
+      </QueryClientProvider>,
+    );
+  const view = renderInbox();
+  fireEvent.change(
+    await screen.findByRole("combobox", { name: "Recommendation sort" }),
+    { target: { value: "metadata_desc" } },
+  );
+  await waitFor(() =>
+    expect(
+      window.localStorage.getItem("vani:recommendation-sort:persist"),
+    ).toBe("metadata_desc"),
+  );
+  view.unmount();
+  renderInbox();
+  expect(
+    await screen.findByRole("combobox", { name: "Recommendation sort" }),
+  ).toHaveValue("metadata_desc");
+  expect(await screen.findByText(/−0.39 ranks above −0.45/)).toBeVisible();
+  client.clear();
+});
+
+it("retains the review and focus when saving fails without claiming success", async () => {
+  vi.mocked(request).mockImplementation(async (_path, init) => {
+    if (init) throw new Error("Save failed");
+    return {
+      settings: { version: 1, profile: { enabled: true } },
+      total: 1,
+      items: [
+        {
+          paper_id: "failed-paper",
+          paper: { title: "Unsaved paper", authors: [] },
+          score: 0.1,
+          explanation: {},
+          sources: [],
+        },
+      ],
+    };
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <RecommendationInbox id="failure" />
+    </QueryClientProvider>,
+  );
+  const save = await screen.findByRole("button", {
+    name: "Save to collection",
+  });
+  save.focus();
+  fireEvent.click(save);
+  await screen.findByText("Save failed");
+  expect(screen.getByText("Unsaved paper")).toBeVisible();
+  expect(save).toHaveFocus();
+  expect(save).toHaveAttribute("aria-disabled", "false");
+  expect(
+    screen.queryByRole("button", { name: "Saved" }),
+  ).toBeNull();
   client.clear();
 });

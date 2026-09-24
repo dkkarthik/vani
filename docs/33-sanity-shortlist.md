@@ -97,3 +97,9 @@ remain visible and adjustable. The next meaningful evaluation is to label severa
 close and poor matches, record expected papers, and compare the next shortlist.
 The saved notes support that review but are not automatically interpreted by
 this classifier. Deep scientific comparisons remain separate work.
+
+## Reviewing without losing your place
+
+Feedback and Save to collection update the card in place. The visible papers and scores stay fixed while the next ranking runs in the background. Choose **Show updated ranking** when ready to load the new order; changing the view, sort, or page also ends the held review. Saved cards stay visible until then.
+
+The sort choice is remembered for each collection in this browser. Metadata scores are signed classifier margins, shown to six decimal places: highest first places −0.39 above −0.45. This ordering applies across the full view before pagination.
