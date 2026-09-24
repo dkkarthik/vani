@@ -4,6 +4,10 @@ Branch: `codex/simple-discovery-inbox`. This is an opt-in alternative discovery
 path integrated into the existing collection page. It does not replace the deep
 reasoning implementation or deploy itself to quasar.
 
+For a more selective second pass, use [Sanity shortlist](33-sanity-shortlist.md).
+It retains this broad discovery path and adds a local focus, refined SVM model,
+and inspectable inclusion/exclusion decisions.
+
 ## What to try
 
 1. Open a manual collection and expand **Discovery settings** under

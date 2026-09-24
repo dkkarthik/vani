@@ -6,7 +6,7 @@ import { retainCandidateSource } from "../planning/monitor.js";
 import { Profile, type Settings } from "./settings.js";
 import { aliases, isPublicPaper, storePaper } from "./corpus.js";
 import { fetchBatch, ProviderError, type Task } from "./sources.js";
-import { rankInWorker } from "./ranking.js";
+import { rankInWorker, shortlistInWorker } from "./ranking.js";
 import type { Document } from "./ranker.js";
 const error = (s: string, statusCode = 409) =>
   Object.assign(Error(s), { statusCode });
@@ -18,7 +18,7 @@ export async function settings(id: string) {
       [id],
     )
   ).rows[0];
-  if (row) return row;
+  if (row) return { ...row, profile: Profile.parse(row.profile) };
   const focus = (
     await pool.query("SELECT profile FROM core_focus WHERE collection_id=$1", [
       id,
@@ -36,6 +36,7 @@ export async function saveSettings(
   id: string,
   version: number,
   profile: Settings,
+  options: { requireIdle?: boolean; preserveSchedule?: boolean } = {},
 ) {
   await manualCollection(pool, id);
   return transaction(async (db) => {
@@ -48,10 +49,27 @@ export async function saveSettings(
     ).rows[0];
     if ((old?.version ?? 0) !== version)
       throw error("Discovery settings changed; reload before saving.");
+    if (
+      options.requireIdle &&
+      (
+        await db.query(
+          "SELECT 1 FROM simple_run WHERE collection_id=$1 AND status IN ('queued','running')",
+          [id],
+        )
+      ).rowCount
+    )
+      throw error(
+        "Wait for the current refresh to finish before changing the Sanity shortlist.",
+      );
     const row = (
       await db.query(
-        "INSERT INTO simple_discovery_settings(collection_id,version,profile) VALUES($1,$2,$3) ON CONFLICT(collection_id) DO UPDATE SET version=excluded.version,profile=excluded.profile,next_refresh_at=now(),updated_at=now() RETURNING *",
-        [id, version + 1, JSON.stringify(profile)],
+        "INSERT INTO simple_discovery_settings(collection_id,version,profile) VALUES($1,$2,$3) ON CONFLICT(collection_id) DO UPDATE SET version=excluded.version,profile=excluded.profile,next_refresh_at=CASE WHEN $4 THEN simple_discovery_settings.next_refresh_at ELSE now() END,updated_at=now() RETURNING *",
+        [
+          id,
+          version + 1,
+          JSON.stringify(profile),
+          options.preserveSchedule ?? false,
+        ],
       )
     ).rows[0];
     await db.query(
@@ -228,6 +246,17 @@ async function rerank(run: any) {
   const chosen = ranked
     .filter((i) => labels.get(i.id) !== "down")
     .slice(0, run.snapshot.maxRecommendations);
+  const shortlistConfig = Profile.parse(run.snapshot).shortlist;
+  const refinement =
+    shortlistConfig.enabled &&
+    !run.tasks.some((t: Task) => t.state === "pending")
+      ? await shortlistInWorker(
+          documents,
+          chosen.map((i) => i.id),
+          shortlistConfig,
+        )
+      : null;
+  const refinedItems = new Map(refinement?.items.map((i) => [i.id, i]));
   // Keep dismissed papers visible under their filter, and persist their new scores too.
   chosen.push(...ranked.filter((i) => labels.get(i.id) === "down"));
   await transaction(async (db) => {
@@ -271,6 +300,7 @@ async function rerank(run: any) {
             terms: item.terms,
             cosine: item.cosine,
             algorithm: result.metadata.algorithm,
+            sanity: refinedItems.get(item.id) ?? null,
           }),
         ],
       );
@@ -281,13 +311,22 @@ async function rerank(run: any) {
         run.id,
         JSON.stringify({
           ...result.metadata,
+          settingsVersion: run.settings_version,
           labelVersion,
           seedLimit: 200,
           eligible: eligible.length,
           shown: chosen.length,
           corpusLimit: 20000,
+          shortlist:
+            refinement?.metadata ??
+            (shortlistConfig.enabled
+              ? { status: "awaiting_source_completion" }
+              : null),
         }),
-        JSON.stringify(result.model),
+        JSON.stringify({
+          ...result.model,
+          shortlist: refinement?.model ?? null,
+        }),
       ],
     );
     await db.query(

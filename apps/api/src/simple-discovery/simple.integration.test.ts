@@ -247,6 +247,112 @@ it.skipIf(!enabled)(
   },
 );
 it.skipIf(!enabled)(
+  "runs a separate local shortlist, retains broad results, and recomputes after feedback",
+  async () => {
+    const { id, app } = await fixture();
+    const method = await storePaper(
+      {
+        connector: "arxiv",
+        externalId: "2601.88888",
+        title: "Adaptive mesh refinement sparse mapping",
+        abstract:
+          "Adaptive mesh refinement graph construction with sparse mapping and occupancy grids.",
+      },
+      {},
+    );
+    const unrelated = await storePaper(
+      {
+        connector: "arxiv",
+        externalId: "2601.88889",
+        title: "Social robot navigation in human crowds",
+        abstract:
+          "Predicting human motion with reinforcement learning for robot navigation.",
+      },
+      {},
+    );
+    const network = vi.fn(() => {
+      throw Error("Second pass must remain local");
+    });
+    vi.stubGlobal("fetch", network);
+    await enqueue(id, "rerank");
+    for (let i = 0; i < 3; i++) await runSimpleWorker();
+    const base = `/api/v1/collections/${id}/recommendations`;
+    const original = (await app.inject({ url: base })).json();
+    expect(original.settings.profile.shortlist.enabled).toBe(false);
+    const selection = {
+      enabled: true,
+      limit: 5,
+      focus: "adaptive mesh refinement sparse mapping",
+      requiredTerms: ["mesh"],
+    };
+    const started = await app.inject({
+      method: "POST",
+      url: base + "/refine",
+      payload: { version: 1, shortlist: selection },
+    });
+    expect(started.statusCode).toBe(202);
+    expect(
+      (await app.inject({ url: base })).json().settings.next_refresh_at,
+    ).toBe(original.settings.next_refresh_at);
+    const blocked = await app.inject({
+      method: "POST",
+      url: base + "/refine",
+      payload: { version: 2, shortlist: selection },
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().message).toContain("Wait");
+    for (let i = 0; i < 3; i++) await runSimpleWorker();
+    let shortlist = (
+      await app.inject({ url: base + "?view=shortlist" })
+    ).json();
+    const broad = (await app.inject({ url: base })).json();
+    const filtered = (
+      await app.inject({ url: base + "?view=filtered" })
+    ).json();
+    expect(broad.total).toBe(original.total);
+    expect(shortlist.shortlistReady).toBe(true);
+    expect(shortlist.items.some((x: any) => x.paper_id === method)).toBe(true);
+    expect(shortlist.total + filtered.total).toBe(broad.total);
+    expect(
+      filtered.items.find((x: any) => x.paper_id === unrelated)?.explanation
+        .sanity.reason,
+    ).toBe("context_mismatch");
+    const down = await app.inject({
+      method: "POST",
+      url: base + `/${method}/feedback`,
+      payload: { label: "down", reason: "Different assumptions" },
+    });
+    expect(down.statusCode).toBe(200);
+    expect(
+      (await app.inject({ url: base + "?view=shortlist" })).json()
+        .shortlistReady,
+    ).toBe(false);
+    for (let i = 0; i < 3; i++) await runSimpleWorker();
+    shortlist = (await app.inject({ url: base + "?view=shortlist" })).json();
+    expect(shortlist.items.some((x: any) => x.paper_id === method)).toBe(false);
+    expect(shortlist.model.metadata.shortlist.negative).toBe(1);
+    expect(network).not.toHaveBeenCalled();
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM core_run WHERE collection_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM collection_membership WHERE collection_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    vi.unstubAllGlobals();
+    await app.close();
+  },
+);
+it.skipIf(!enabled)(
   "deduplicates public records across providers and never imports private papers",
   async () => {
     const { id, app } = await fixture();

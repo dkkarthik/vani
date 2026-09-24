@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { v7 as uuid } from "uuid";
 import { pool, transaction } from "../db.js";
-import { Profile } from "./settings.js";
+import { Profile, Shortlist } from "./settings.js";
 import {
   settings,
   saveSettings,
@@ -19,7 +19,7 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
       .object({
         offset: z.coerce.number().int().min(0).default(0),
         view: z
-          .enum(["recommended", "saved", "dismissed"])
+          .enum(["recommended", "shortlist", "filtered", "saved", "dismissed"])
           .default("recommended"),
       })
       .parse(r.query);
@@ -45,13 +45,34 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
             [id],
           )
         ).rows[0] ?? null);
+    const shortlistReady =
+      cfg.profile.shortlist.enabled &&
+      model?.metadata.shortlist?.status === "ready" &&
+      model.metadata.settingsVersion === cfg.version &&
+      model.metadata.labelVersion === cfg.label_version;
     const predicate =
       q.view === "saved"
         ? "r.work_id IS NOT NULL"
         : q.view === "dismissed"
           ? "r.feedback='down'"
-          : "r.work_id IS NULL AND r.feedback IS DISTINCT FROM 'down' AND r.run_id=$2";
-    const args = q.view === "recommended" ? [id, model?.run_id ?? null] : [id];
+          : "r.work_id IS NULL AND r.feedback IS DISTINCT FROM 'down' AND r.run_id=$2" +
+            (q.view === "shortlist"
+              ? " AND r.explanation#>>'{sanity,selected}'='true'"
+              : q.view === "filtered"
+                ? " AND r.explanation#>>'{sanity,selected}'='false'"
+                : "");
+    const rankedView = !["saved", "dismissed"].includes(q.view);
+    const args = rankedView
+      ? [
+          id,
+          ["shortlist", "filtered"].includes(q.view) && !shortlistReady
+            ? null
+            : (model?.run_id ?? null),
+        ]
+      : [id];
+    const order = ["shortlist", "filtered"].includes(q.view)
+      ? "(r.explanation#>>'{sanity,score}')::double precision DESC NULLS LAST,r.paper_id"
+      : "r.score DESC NULLS LAST,r.paper_id";
     const total = (
       await pool.query(
         `SELECT count(*)::int n FROM simple_recommendation r WHERE r.collection_id=$1 AND ${predicate}`,
@@ -60,7 +81,7 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
     ).rows[0].n;
     const items = (
       await pool.query(
-        `SELECT r.*,p.paper,p.sources FROM simple_recommendation r JOIN simple_paper p ON p.id=r.paper_id WHERE r.collection_id=$1 AND ${predicate} ORDER BY r.score DESC NULLS LAST,r.paper_id LIMIT 25 OFFSET $${args.length + 1}`,
+        `SELECT r.*,p.paper,p.sources FROM simple_recommendation r JOIN simple_paper p ON p.id=r.paper_id WHERE r.collection_id=$1 AND ${predicate} ORDER BY ${order} LIMIT 25 OFFSET $${args.length + 1}`,
         [...args, q.offset],
       )
     ).rows;
@@ -71,6 +92,7 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
       model,
       items,
       total,
+      shortlistReady,
       simpleOnly: process.env.VANI_SIMPLE_DISCOVERY_ONLY === "true",
     };
   });
@@ -80,6 +102,27 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
       .parse(r.body);
     return saveSettings(Id.parse((r.params as any).id), d.version, d.profile);
   });
+  app.post(
+    "/api/v1/collections/:id/recommendations/refine",
+    async (r, reply) => {
+      const id = Id.parse((r.params as any).id);
+      const d = z
+        .object({ version: z.number().int().min(0), shortlist: Shortlist })
+        .parse(r.body);
+      const cfg = await settings(id);
+      if (!cfg.profile.enabled)
+        throw Object.assign(Error("Enable simple discovery first."), {
+          statusCode: 409,
+        });
+      await saveSettings(
+        id,
+        d.version,
+        { ...cfg.profile, shortlist: d.shortlist },
+        { requireIdle: true, preserveSchedule: true },
+      );
+      return reply.code(202).send(await enqueue(id, "rerank"));
+    },
+  );
   app.post(
     "/api/v1/collections/:id/recommendations/refresh",
     async (r, reply) => {

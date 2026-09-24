@@ -114,3 +114,131 @@ it("shows metadata immediately and exposes refresh, feedback, save and public se
   );
   client.clear();
 });
+
+it("defaults to a ready shortlist, explains filtered papers, and saves local focus controls", async () => {
+  const profile = {
+    enabled: true,
+    daily: false,
+    sources: ["arxiv"],
+    publicQueries: ["mesh"],
+    arxivCategories: [],
+    pagesPerQuery: 1,
+    maxRecommendations: 500,
+    shortlist: {
+      enabled: true,
+      focus: "adaptive mesh",
+      requiredTerms: ["mesh"],
+      limit: 30,
+    },
+  };
+  vi.mocked(request).mockImplementation(async (path, init) =>
+    init
+      ? {}
+      : {
+          settings: { version: 3, profile },
+          total: 1,
+          shortlistReady: true,
+          model: {
+            updated_at: "2026-09-24T00:00:00Z",
+            metadata: {
+              positive: 1,
+              negative: 0,
+              corpusSize: 100,
+              background: 99,
+              shortlist: {
+                candidates: 100,
+                selected: 1,
+                positive: 1,
+                status: "ready",
+              },
+            },
+          },
+          items: [
+            {
+              paper_id: "paper",
+              paper: {
+                title: path.includes("view=filtered")
+                  ? "Unrelated graph application"
+                  : "Adaptive mesh maps",
+                authors: [],
+              },
+              sources: [],
+              score: 0.4,
+              explanation: {
+                sanity: {
+                  selected: !path.includes("view=filtered"),
+                  reason: path.includes("view=filtered")
+                    ? "context_mismatch"
+                    : "shortlisted",
+                  score: 0.2,
+                  overlap: 0.3,
+                  matchedFocus: ["mesh"],
+                  matchedContext: ["mesh"],
+                  terms: [],
+                },
+              },
+            },
+          ],
+        },
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <RecommendationInbox id="collection" />
+    </QueryClientProvider>,
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", { name: "Recommendation view" }),
+    ).toHaveValue("shortlist"),
+  );
+  expect(
+    await screen.findByText(
+      "100 broad candidates → 1 shortlisted. Local text model; relevance still needs your review.",
+    ),
+  ).toBeVisible();
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Recommendation view" }),
+    { target: { value: "filtered" } },
+  );
+  expect(await screen.findByText("Unrelated graph application")).toBeVisible();
+  fireEvent.click(
+    screen.getByText("Filtered by Sanity", { selector: "summary" }),
+  );
+  expect(
+    await screen.findByText(
+      "No required context term or phrase occurs in the available title and abstract.",
+    ),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Refine with Sanity" }));
+  fireEvent.change(screen.getByLabelText("Local relevance focus"), {
+    target: { value: "Adaptive spatial meshes" },
+  });
+  fireEvent.change(
+    screen.getByLabelText("Required context (one term or phrase per line)"),
+    { target: { value: "mesh\noccupancy" } },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Save and refine locally" }),
+  );
+  await waitFor(() => {
+    const call = vi
+      .mocked(request)
+      .mock.calls.find(
+        ([path]) => path === "/collections/collection/recommendations/refine",
+      );
+    expect(call?.[1]?.method).toBe("POST");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+      version: 3,
+      shortlist: {
+        enabled: true,
+        limit: 30,
+        focus: "Adaptive spatial meshes",
+        requiredTerms: ["mesh", "occupancy"],
+      },
+    });
+  });
+  client.clear();
+});
