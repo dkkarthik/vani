@@ -104,7 +104,7 @@ provisioned local test database; it does not create one or configure its passwor
 
 ```bash
 DATABASE_URL='postgres://vani@127.0.0.1:55449/vani_simple_preview' \
-VANI_DATA_DIR='/tmp/vani-simple-preview-objects' \
+VANI_DATA_DIR="$PWD/.vani-diagnostics/simple-discovery/sandbox/objects" \
 VANI_API_HOST=127.0.0.1 VANI_API_PORT=8086 \
 VANI_WEB_ORIGIN=http://127.0.0.1:3004 \
 VANI_SIMPLE_DISCOVERY_ONLY=true \
@@ -123,6 +123,15 @@ legacy core/audit/enrichment worker lanes in this API process while leaving the
 new discovery worker and scheduler active. It is not a global switch for other
 running installations. Without it, existing core jobs may continue even when
 simple discovery is enabled for a collection.
+
+Keep the database cluster and object store in persistent directories. The local
+GoLF sandbox uses `.vani-diagnostics/simple-discovery/sandbox/postgres` and
+`sandbox/objects` under the same parent, with startup notes in `sandbox/README.md`.
+These directories are git-ignored. The earlier `/tmp` cluster and object store
+disappeared between sessions; retained diagnostic snapshots recovered the seed
+and corpus, but could not recover feedback recorded after those snapshots.
+Back up the database with `pg_dump` and retain the PDF object store alongside it.
+A ranking snapshot is useful for comparison but is not a complete database backup.
 
 The existing [quasar debug regression job](28-quasar-debugging.md) can test the
 committed branch without stopping production. The old model-backed lab/browser
