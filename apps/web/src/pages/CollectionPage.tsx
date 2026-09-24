@@ -1,4 +1,5 @@
 import { RecommendationInbox } from "../components/RecommendationInbox";
+import { PaperCitation } from "../components/PaperCitation";
 import { CorePanel } from "../components/CorePanel";
 import { DeepRefresh } from "../components/DeepRefresh";
 import { CollectionKeywords } from "../components/CollectionKeywords";
@@ -351,10 +352,7 @@ export function CollectionPage() {
                 <a href={`/read/${work.id}`} className="paper-title">
                   {work.title}
                 </a>
-                <small>
-                  {work.authors.map((author) => author.family).join(", ")} ·{" "}
-                  {work.venue}
-                </small>
+                <PaperCitation paper={work} reference={work.reference} />
                 <button
                   className="first-pass-link"
                   onClick={() => {

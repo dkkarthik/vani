@@ -35,8 +35,10 @@ it("shows metadata immediately and exposes refresh, feedback, save and public se
               paper: {
                 title: "Sparse adaptive maps",
                 abstract: "We refine the map adaptively.",
-                authors: [],
+                authors: [{ given: "Ada", family: "Researcher" }],
                 year: 2026,
+                venue: "arXiv",
+                url: "https://arxiv.org/abs/2601.12345",
               },
               explanation: {
                 algorithm: "tfidf-linear-svm-v1",
@@ -58,6 +60,12 @@ it("shows metadata immediately and exposes refresh, feedback, save and public se
     </QueryClientProvider>,
   );
   expect(await screen.findByText("Sparse adaptive maps")).toBeVisible();
+  expect(screen.getByLabelText("Bibliographic citation")).toHaveTextContent(
+    "Ada Researcher (2026). Sparse adaptive maps. arXiv.",
+  );
+  expect(
+    screen.getByRole("link", { name: "View PDF (source)" }),
+  ).toHaveAttribute("href", "https://arxiv.org/pdf/2601.12345");
   fireEvent.click(
     screen.getByRole("button", { name: "Refresh recommendations" }),
   );

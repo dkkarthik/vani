@@ -10,6 +10,7 @@ import { DiscoverySeed, type CollectionWork, type Work } from "@vani/shared";
 import { pool, query, transaction } from "./db.js";
 import { Repository } from "./repository.js";
 import { firstPass, synthesize } from "./first-pass.js";
+import { paperReferences } from "./lib/paper-references.js";
 
 // Search by minute in UTC: this handles DST and non-integral UTC offsets without fixed-offset arithmetic.
 export function nextMorning(now: Date, timezone: string, hour: number): Date {
@@ -140,11 +141,15 @@ export async function collectionMembers(
   ).rows[0];
   const keywords =
     focus?.keywords ?? defaultKeywords(focus?.discovery?.topic ?? "");
+  const references = await paperReferences(
+    works.map((work) => ({ paper: work, workId: work.id })),
+  );
   return {
-    items: works.map((work) => {
+    items: works.map((work, index) => {
       const row = metadata.rows.find((item) => item.work_id === work.id);
       return {
         ...work,
+        reference: references[index],
         isNew: !row?.seen_at,
         status: row?.status ?? "inbox",
         firstPass: row?.report,

@@ -1,6 +1,46 @@
 import { v7 as uuid } from "uuid";
 import { transaction } from "../db.js";
 import { cleanDoi } from "../lib/citations.js";
+import { bibliographicMetadata } from "@vani/shared";
+
+export function mergePaperMetadata(old: any, incoming: any) {
+  const previous = bibliographicMetadata(old),
+    next = bibliographicMetadata(incoming);
+  const isPreprint = (p: any) =>
+    p.manifestationType === "preprint" || /^arxiv$/i.test(p.venue ?? "");
+  const keepPublished =
+    old && previous.venue && !isPreprint(old) && isPreprint(incoming);
+  const primary = keepPublished ? previous : next,
+    fallback = keepPublished ? next : previous;
+  const paper = { ...old, ...incoming };
+  for (const key of [
+    "title",
+    "year",
+    "venue",
+    "doi",
+    "volume",
+    "issue",
+    "pages",
+    "articleNumber",
+    "publisher",
+    "arxivId",
+  ] as const)
+    paper[key] = primary[key] || fallback[key];
+  paper.authors = primary.authors.length ? primary.authors : fallback.authors;
+  if (paper.title === "Untitled" && fallback.title !== "Untitled")
+    paper.title = fallback.title;
+  paper.pdfUrls = [...new Set([...previous.pdfUrls, ...next.pdfUrls])];
+  paper.abstract =
+    (incoming.abstract ?? "").length >= (old?.abstract ?? "").length
+      ? incoming.abstract
+      : old.abstract;
+  paper.url =
+    incoming.url ||
+    old?.url ||
+    (paper.doi ? "https://doi.org/" + paper.doi : "");
+  if (keepPublished) paper.manifestationType = old.manifestationType;
+  return paper;
+}
 export function aliases(p: any): string[] {
   const out: string[] = [];
   const doi = cleanDoi(p.doi);
@@ -54,15 +94,7 @@ export async function storePaper(p: any, source: any) {
     const old = (
       await db.query("SELECT paper,sources FROM simple_paper WHERE id=$1", [id])
     ).rows[0];
-    const paper = {
-      ...old?.paper,
-      ...p,
-      abstract:
-        (p.abstract ?? "").length >= (old?.paper.abstract ?? "").length
-          ? p.abstract
-          : old.paper.abstract,
-      url: p.url || old?.paper.url || (p.doi ? "https://doi.org/" + p.doi : ""),
-    };
+    const paper = mergePaperMetadata(old?.paper, p);
     const provenance = {
       source: p.connector,
       externalId: p.externalId,

@@ -171,13 +171,18 @@ export async function fetchBatch(task: Task): Promise<Candidate[]> {
     url: p.URL,
     authors: (p.author ?? []).map((a: any) => ({
       given: a.given ?? "",
-      family: a.family ?? "",
+      family: a.family || a.name || "",
     })),
     year: p.published?.["date-parts"]?.[0]?.[0] ?? null,
     venue: text(p["container-title"]?.[0]),
+    volume: text(p.volume),
+    issue: text(p.issue),
+    pages: text(p.page),
+    articleNumber: text(p["article-number"]),
+    publisher: text(p.publisher),
     connector: "crossref",
     externalId: p.DOI || p.URL,
-    sourcePayload: { DOI: p.DOI, URL: p.URL },
+    sourcePayload: { DOI: p.DOI, URL: p.URL, link: p.link },
     accessClass: "metadata_only",
   }));
 }

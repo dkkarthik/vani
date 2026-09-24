@@ -154,6 +154,11 @@
 .card-drag { touch-action:none; border:0; background:#e5eee7; color:#426455; border-radius:4px; font-size:11px; padding:5px 8px; cursor:grab; }
 .board-list li { padding:12px; border-bottom:1px solid var(--line); }
 .candidate-feedback { border-top:1px solid var(--line); margin-top:18px; padding-top:12px; }
+.paper-citation { font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.paper-citation p { margin:8px 0; }
+.paper-citation p a { margin-right:10px; }
+.paper-access { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:10px 0; }
+.paper-access .button { font-size:12px; padding:6px 10px; }
 
 /* Collection research engine controls. */
 .core-panel { overflow-wrap: anywhere; }

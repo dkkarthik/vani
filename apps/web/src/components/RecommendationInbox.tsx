@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { request } from "../api";
 import { ErrorNotice } from "./ui";
+import { externalPaperUrl, paperReference } from "@vani/shared";
+import { PaperCitation } from "./PaperCitation";
 const sanityReasons: Record<string, string> = {
   shortlisted: "Selected by the second-pass model and focus checks.",
   outside_limit:
@@ -36,12 +38,8 @@ function Paper({ row, id, changed, shortlistReady, view }: any) {
     row.explanation.sanity &&
     ["shortlist", "filtered"].includes(view);
   const p = row.paper,
-    href =
-      typeof p.url === "string" && /^https?:\/\//.test(p.url)
-        ? p.url
-        : p.doi
-          ? "https://doi.org/" + encodeURIComponent(p.doi)
-          : null;
+    reference = row.reference ?? paperReference(p),
+    href = externalPaperUrl(p.url) ?? externalPaperUrl(reference.recordUrl);
   return (
     <article
       className="card"
@@ -61,13 +59,7 @@ function Paper({ row, id, changed, shortlistReady, view }: any) {
           p.title
         )}
       </h3>
-      <p>
-        {(p.authors ?? [])
-          .slice(0, 5)
-          .map((a: any) => [a.given, a.family].filter(Boolean).join(" "))
-          .join(", ")}{" "}
-        · {p.year ?? "Year unknown"} · {p.venue ?? ""}
-      </p>
+      <PaperCitation paper={p} reference={reference} />
       <p>
         <strong>
           {row.work_id

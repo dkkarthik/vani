@@ -3,6 +3,7 @@ import { z } from "zod";
 import { v7 as uuid } from "uuid";
 import { pool, transaction } from "../db.js";
 import { Profile, Shortlist } from "./settings.js";
+import { paperReferences } from "../lib/paper-references.js";
 import {
   settings,
   saveSettings,
@@ -85,12 +86,18 @@ export async function registerSimpleDiscovery(app: FastifyInstance) {
         [...args, q.offset],
       )
     ).rows;
+    const references = await paperReferences(
+      items.map((row) => ({ paper: row.paper, workId: row.work_id })),
+    );
     return {
       settings: cfg,
       run,
       sourceRun,
       model,
-      items,
+      items: items.map((row, index) => ({
+        ...row,
+        reference: references[index],
+      })),
       total,
       shortlistReady,
       simpleOnly: process.env.VANI_SIMPLE_DISCOVERY_ONLY === "true",

@@ -1,5 +1,7 @@
 export * from "./metadata.js";
 export * from "./imports.js";
+export * from "./references.js";
+import type { PaperReference } from "./references.js";
 import { z } from "zod";
 export * from "./capture.js";
 
@@ -127,6 +129,7 @@ export interface FirstPass {
   createdAt: string;
 }
 export type CollectionWork = Work & {
+  reference?: PaperReference;
   isNew: boolean;
   status: WorkStatus;
   firstPass?: FirstPass;

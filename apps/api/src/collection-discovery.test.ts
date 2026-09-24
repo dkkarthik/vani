@@ -21,6 +21,7 @@ vi.mock("./core/service.js", () => ({
 vi.mock("./db.js", () => ({
   query: mocks.query,
   pool: {
+    query: mocks.query,
     connect: async () => ({ query: mocks.clientQuery, release: mocks.release }),
   },
   transaction: async (fn: any) => fn({ query: mocks.query }),
@@ -183,6 +184,7 @@ describe("living collections", () => {
       "c",
     );
     expect(result.items[0]).toMatchObject({ isNew: true, status: "reading" });
+    expect(result.items[0]?.reference?.text).toContain(work.title);
     expect(
       mocks.query.mock.calls.every((call) => call[0].startsWith("SELECT")),
     ).toBe(true);

@@ -1,4 +1,5 @@
 import { v7 as uuid } from "uuid";
+import { bibliographicMetadata } from "@vani/shared";
 import { pool, transaction } from "../db.js";
 import { Repository } from "../repository.js";
 import { manualCollection } from "../research/organization.js";
@@ -504,11 +505,21 @@ export async function savePaper(collection: string, paperId: string) {
   ).rows[0];
   if (!r) throw error("Recommendation not found.", 404);
   const repo = new Repository();
+  const metadata = bibliographicMetadata(r.paper);
+  const paper = {
+    ...r.paper,
+    ...metadata,
+    sourcePayload: {
+      ...r.paper.sourcePayload,
+      pdfUrls: metadata.pdfUrls,
+      arxivId: metadata.arxivId,
+    },
+  };
   const work = r.work_id
     ? await repo.getWork(r.work_id)
-    : await repo.createWork({ ...r.paper, deduplicateByTitle: true });
+    : await repo.createWork({ ...paper, deduplicateByTitle: true });
   if (!work) throw error("Paper unavailable.", 404);
-  await retainCandidateSource(work.id, r.paper);
+  await retainCandidateSource(work.id, paper);
   await transaction(async (db) => {
     await db.query("SELECT id FROM collection WHERE id=$1 FOR UPDATE", [
       collection,
